@@ -38,8 +38,6 @@ namespace clinical.APIs.Controllers
             }
             return Ok(patient);
         }
-    
-
         [HttpPost]
         public async Task<IActionResult> CreatePatient([FromBody] Patient patient)
         {
@@ -54,9 +52,10 @@ namespace clinical.APIs.Controllers
                     .SelectMany(v => v.Errors)
                     .Select(e => e.ErrorMessage)
                     .ToList();
-                
-                return BadRequest(new { 
-                    error = "Validation failed", 
+
+                return BadRequest(new
+                {
+                    error = "Validation failed",
                     details = errors,
                     hint = "Required fields: First, Last, Gender, DOB (format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)"
                 });
@@ -73,7 +72,5 @@ namespace clinical.APIs.Controllers
                 return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
-
-
     }
 }   
