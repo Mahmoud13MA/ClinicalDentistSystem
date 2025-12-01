@@ -12,7 +12,7 @@ namespace clinical.APIs.Models
         public string First { get; set; }
 
         [StringLength(100)]
-        public string? Middle { get; set; }
+        public string Middle { get; set; }
 
         [Required(ErrorMessage = "Last name is required")]
         [StringLength(100)]
