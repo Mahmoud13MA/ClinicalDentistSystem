@@ -17,7 +17,7 @@ namespace clinical.APIs.Controllers
         }
 
         [HttpGet]
-        [Route(" ")]
+        [Route("")]
         public async Task<IActionResult> GetPatient()
         {
             var patients = await _context.Patients.ToListAsync();
