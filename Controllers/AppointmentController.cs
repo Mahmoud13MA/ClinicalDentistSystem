@@ -18,7 +18,7 @@ namespace clinical.APIs.Controllers
 
         // GET: /Appointment
         [HttpGet]
-        [Route(" ")]
+        [Route("")]
         public async Task<IActionResult> GetAppointments()
         {
             var appointments = await _context.Appointments
