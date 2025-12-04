@@ -17,6 +17,7 @@ namespace clinical.APIs.Controllers
         }
 
         [HttpGet]
+        [Route("")]
         public async Task<IActionResult> GetPatient()
         {
             var patients = await _context.Patients.ToListAsync();
@@ -72,5 +73,69 @@ namespace clinical.APIs.Controllers
                 return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
+
+        [HttpPut("{Patient_ID}")]
+        public async Task<IActionResult> UpdatePatient(int Patient_ID, [FromBody] Patient patient)
+        {
+            if (patient == null)
+            {
+                return BadRequest(new { error = "Patient data is required." });
+            }
+
+            if (Patient_ID != patient.Patient_ID)
+            {
+                return BadRequest(new { error = "Patient ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+
+                return BadRequest(new
+                {
+                    error = "Validation failed",
+                    details = errors
+                });
+            }
+
+            try
+            {
+                // Check if patient exists
+                var existingPatient = await _context.Patients.FindAsync(Patient_ID);
+                if (existingPatient == null)
+                {
+                    return NotFound(new { error = "Patient not found.", patient_ID = Patient_ID });
+                }
+
+                // Update patient properties
+                existingPatient.First = patient.First;
+                existingPatient.Middle = patient.Middle;
+                existingPatient.Last = patient.Last;
+                existingPatient.Gender = patient.Gender;
+                existingPatient.DOB = patient.DOB;
+
+                _context.Patients.Update(existingPatient);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Patient updated successfully.", patient = existingPatient });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Check if patient still exists
+                if (!await _context.Patients.AnyAsync(p => p.Patient_ID == Patient_ID))
+                {
+                    return NotFound(new { error = "Patient not found during update.", patient_ID = Patient_ID });
+                }
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var innerMessage = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
+            }
+        }
     }
-}
+}   

@@ -12,7 +12,7 @@ namespace clinical.APIs.Models
         public string Phone { get; set; }
 
 
-        public ICollection<Appointment> Appointments { get; set; }
-        public ICollection<Stock_Transaction> StockTransactions { get; set; }
+        public ICollection<Appointment>? Appointments { get; set; }
+        public ICollection<Stock_Transaction>? StockTransactions { get; set; }
     }
 }

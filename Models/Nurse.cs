@@ -10,7 +10,7 @@ namespace clinical.APIs.Models
         public string Name { get; set; }
         public string Phone { get; set; }
 
-        public ICollection<Appointment> Appointments { get; set; }
+        public ICollection<Appointment>? Appointments { get; set; }
     }
 }
 
