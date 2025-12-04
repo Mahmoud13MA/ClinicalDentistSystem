@@ -12,7 +12,7 @@ namespace clinical.APIs.Models
         public string Unit { get; set; }
         public int Quantity { get; set; }
 
-        public ICollection<Stock_Transaction> StockTransactions { get; set; }
+        public ICollection<Stock_Transaction>? StockTransactions { get; set; }
     }
 }
 
