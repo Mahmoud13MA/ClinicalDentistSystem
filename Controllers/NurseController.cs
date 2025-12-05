@@ -1,10 +1,12 @@
-using Microsoft.AspNetCore.Mvc;
 using clinical.APIs.Data;
 using clinical.APIs.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace clinical.APIs.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("[controller]")]
     public class NurseController : Controller
@@ -88,6 +90,7 @@ namespace clinical.APIs.Controllers
         }
 
         // PUT: /Nurse/{id}
+        [Authorize(Policy = "DoctorOnly")]
         [HttpPut("{NURSE_ID}")]
         public async Task<IActionResult> UpdateNurse(int NURSE_ID, [FromBody] Nurse nurse)
         {
@@ -150,6 +153,7 @@ namespace clinical.APIs.Controllers
         }
 
         // DELETE: /Nurse/{id}
+        [Authorize(Policy ="DoctorOnly")]
         [HttpDelete("{NURSE_ID}")]
         public async Task<IActionResult> DeleteNurse(int NURSE_ID)
         {

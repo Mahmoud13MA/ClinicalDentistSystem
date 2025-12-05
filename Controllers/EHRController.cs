@@ -1,10 +1,12 @@
 using clinical.APIs.Data;
 using clinical.APIs.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace clinical.APIs.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("[controller]")]
     public class EHRController : Controller
@@ -50,6 +52,7 @@ namespace clinical.APIs.Controllers
             return Ok(ehrs);
         }
 
+        [Authorize(Policy = "DoctorOnly")]
         [HttpPost]
         public async Task<IActionResult> CreateEHR([FromBody] EHR ehr)
         {
@@ -99,7 +102,7 @@ namespace clinical.APIs.Controllers
                 return StatusCode(500, new { error = "Internal server error", message = ex.Message });
             }
         }
-
+        [Authorize(Policy = "DoctorOnly")]
         [HttpPut("{EHR_ID}")]
         public async Task<IActionResult> UpdateEHR(int EHR_ID, [FromBody] EHR ehr)
         {

@@ -1,10 +1,13 @@
 using clinical.APIs.Data;
 using clinical.APIs.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace clinical.APIs.Controllers
 {
+    [Authorize(Policy ="DoctorOnly")]
+
     [ApiController]
     [Route("[controller]")]
     public class DoctorController : Controller
