@@ -1,22 +1,23 @@
-﻿using clinical.APIs.Data;
-using clinical.APIs.DTOs;
+﻿using Microsoft.AspNetCore.Mvc;
+using clinical.APIs.Data;
 using clinical.APIs.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using clinical.APIs.DTOs;
+using clinical.APIs.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace clinical.APIs.Controllers
 {
-    [Authorize]
     [ApiController]
     [Route("[controller]")]
     public class AppointmentController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IAppointmentMappingService _mappingService;
 
-        public AppointmentController(AppDbContext context)
+        public AppointmentController(AppDbContext context, IAppointmentMappingService mappingService)
         {
             _context = context;
+            _mappingService = mappingService;
         }
 
         // GET: /Appointment
@@ -26,16 +27,17 @@ namespace clinical.APIs.Controllers
         {
             var appointments = await _context.Appointments
                 .Include(a => a.Patient)
-                .Include(a => a.Doctor)
-                .Include(a => a.Nurse)
-                .ToListAsync();
+                 .Include(a => a.Doctor)
+                 .Include(a => a.Nurse)
+                 .ToListAsync();
 
             if (appointments == null || appointments.Count == 0)
             {
                 return NotFound(new { message = "No appointments found." });
             }
 
-            return Ok(appointments);
+            var response = _mappingService.MapToResponseList(appointments);
+            return Ok(response);
         }
 
         // GET: /Appointment/{id}
@@ -43,9 +45,9 @@ namespace clinical.APIs.Controllers
         public async Task<IActionResult> GetAppointmentById(int Appointment_ID)
         {
             var appointment = await _context.Appointments
-                .Include(a => a.Patient)
-                .Include(a => a.Doctor)
-                .Include(a => a.Nurse)
+                 .Include(a => a.Patient)
+                 .Include(a => a.Doctor)
+                 .Include(a => a.Nurse)
                 .FirstOrDefaultAsync(a => a.Appointment_ID == Appointment_ID);
 
             if (appointment == null)
@@ -53,8 +55,12 @@ namespace clinical.APIs.Controllers
                 return NotFound(new { error = "Appointment not found.", appointment_ID = Appointment_ID });
             }
 
-            return Ok(appointment);
+            var response = _mappingService.MapToResponse(appointment);
+            return Ok(response);
         }
+
+
+
 
         // POST: /Appointment
         [HttpPost]
@@ -62,7 +68,7 @@ namespace clinical.APIs.Controllers
         {
             if (request == null)
             {
-                return BadRequest(new { error = "Appointment data is required."});
+                return BadRequest(new { error = "Appointment data is required.", hint = "Make sure you're sending a valid JSON body with appointment information." });
             }
 
             if (!ModelState.IsValid)
@@ -103,10 +109,9 @@ namespace clinical.APIs.Controllers
                     return BadRequest(new { error = "Invalid Nurse_ID. Nurse does not exist.", nurse_ID = request.Nurse_ID });
                 }
 
-                // Generate reference number automatically
-                var refNum = await GenerateReferenceNumber();
+                // Generate reference number if not provided
+                string refNum = $"APT-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
 
-                // Create appointment from request DTO
                 var appointment = new Appointment
                 {
                     Date = request.Date,
@@ -121,7 +126,15 @@ namespace clinical.APIs.Controllers
                 _context.Appointments.Add(appointment);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction(nameof(GetAppointmentById), new { Appointment_ID = appointment.Appointment_ID }, appointment);
+                // Load related entities for response
+                var createdAppointment = await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.Doctor)
+                    .Include(a => a.Nurse)
+                    .FirstOrDefaultAsync(a => a.Appointment_ID == appointment.Appointment_ID);
+
+                var response = _mappingService.MapToResponse(createdAppointment);
+                return CreatedAtAction(nameof(GetAppointmentById), new { Appointment_ID = appointment.Appointment_ID }, response);
             }
             catch (Exception ex)
             {
@@ -130,24 +143,20 @@ namespace clinical.APIs.Controllers
             }
         }
 
-        // Helper method to generate reference number
-        private async Task<string> GenerateReferenceNumber()
-        {
-            var year = DateTime.Now.Year;
-            var count = await _context.Appointments.CountAsync() + 1;
-            return $"APT-{year}-{count:D3}";
-        }
+
+
+
 
         // PUT: /Appointment/{id}
         [HttpPut("{Appointment_ID}")]
-        public async Task<IActionResult> UpdateAppointment(int Appointment_ID, [FromBody] Appointment appointment)
+        public async Task<IActionResult> UpdateAppointment(int Appointment_ID, [FromBody] AppointmentUpdateRequest request)
         {
-            if (appointment == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Appointment data is required." });
             }
 
-            if (Appointment_ID != appointment.Appointment_ID)
+            if (Appointment_ID != request.Appointment_ID)
             {
                 return BadRequest(new { error = "Appointment ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
@@ -176,39 +185,46 @@ namespace clinical.APIs.Controllers
                 }
 
                 // Validate that Patient exists
-                var patientExists = await _context.Patients.AnyAsync(p => p.Patient_ID == appointment.Patient_ID);
+                var patientExists = await _context.Patients.AnyAsync(p => p.Patient_ID == request.Patient_ID);
                 if (!patientExists)
                 {
-                    return BadRequest(new { error = "Invalid Patient_ID. Patient does not exist.", patient_ID = appointment.Patient_ID });
+                    return BadRequest(new { error = "Invalid Patient_ID. Patient does not exist.", patient_ID = request.Patient_ID });
                 }
 
                 // Validate that Doctor exists
-                var doctorExists = await _context.Doctors.AnyAsync(d => d.ID == appointment.Doctor_ID);
+                var doctorExists = await _context.Doctors.AnyAsync(d => d.ID == request.Doctor_ID);
                 if (!doctorExists)
                 {
-                    return BadRequest(new { error = "Invalid Doctor_ID. Doctor does not exist.", doctor_ID = appointment.Doctor_ID });
+                    return BadRequest(new { error = "Invalid Doctor_ID. Doctor does not exist.", doctor_ID = request.Doctor_ID });
                 }
 
                 // Validate that Nurse exists
-                var nurseExists = await _context.Nurses.AnyAsync(n => n.NURSE_ID == appointment.Nurse_ID);
+                var nurseExists = await _context.Nurses.AnyAsync(n => n.NURSE_ID == request.Nurse_ID);
                 if (!nurseExists)
                 {
-                    return BadRequest(new { error = "Invalid Nurse_ID. Nurse does not exist.", nurse_ID = appointment.Nurse_ID });
+                    return BadRequest(new { error = "Invalid Nurse_ID. Nurse does not exist.", nurse_ID = request.Nurse_ID });
                 }
 
-                // Update appointment properties
-                existingAppointment.Date = appointment.Date;
-                existingAppointment.Time = appointment.Time;
-                existingAppointment.Ref_Num = appointment.Ref_Num;
-                existingAppointment.Type = appointment.Type;
-                existingAppointment.Patient_ID = appointment.Patient_ID;
-                existingAppointment.Doctor_ID = appointment.Doctor_ID;
-                existingAppointment.Nurse_ID = appointment.Nurse_ID;
+                // Update appointment properties 
+                existingAppointment.Date = request.Date;
+                existingAppointment.Time = request.Time;
+                existingAppointment.Type = request.Type;
+                existingAppointment.Patient_ID = request.Patient_ID;
+                existingAppointment.Doctor_ID = request.Doctor_ID;
+                existingAppointment.Nurse_ID = request.Nurse_ID;
 
                 _context.Appointments.Update(existingAppointment);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Appointment updated successfully.", appointment = existingAppointment });
+                // Load related entities for response
+                var updatedAppointment = await _context.Appointments
+                    .Include(a => a.Patient)
+                    .Include(a => a.Doctor)
+                    .Include(a => a.Nurse)
+                    .FirstOrDefaultAsync(a => a.Appointment_ID == Appointment_ID);
+
+                var response = _mappingService.MapToResponse(updatedAppointment);
+                return Ok(new { message = "Appointment updated successfully.", appointment = response });
             }
             catch (DbUpdateConcurrencyException)
             {
