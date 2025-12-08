@@ -11,6 +11,7 @@ namespace clinical.APIs.Models
         public string Category { get; set; }
         public string Unit { get; set; }
         public int Quantity { get; set; }
+        public string? Description { get; set; }
 
         public ICollection<Stock_Transaction>? StockTransactions { get; set; }
     }

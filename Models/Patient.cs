@@ -25,10 +25,17 @@ namespace clinical.APIs.Models
         [Required(ErrorMessage = "Date of birth is required")]
         public DateTime DOB { get; set; }
 
+        [StringLength(20)]
+        [Phone]
+        public string? Phone { get; set; }
+
         
         public ICollection<Appointment>? Appointments { get; set; }
         public ICollection<EHR>? EHRs { get; set; }
     }
 }
+
+
+
 
 

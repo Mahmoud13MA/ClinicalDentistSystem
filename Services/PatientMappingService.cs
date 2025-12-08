@@ -17,7 +17,8 @@ namespace clinical.APIs.Services
                 Middle = patient.Middle,
                 Last = patient.Last,
                 Gender = patient.Gender,
-                DOB = patient.DOB
+                DOB = patient.DOB,
+                Phone = patient.Phone
             };
         }
 

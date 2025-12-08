@@ -24,6 +24,7 @@ namespace clinical.APIs.DTOs
         public string FullName => $"{First} {Middle} {Last}".Replace("  ", " ").Trim();
         public string Gender { get; set; }
         public DateTime DOB { get; set; }
+        public string? Phone { get; set; }
     }
 
     public class DoctorBasicInfo

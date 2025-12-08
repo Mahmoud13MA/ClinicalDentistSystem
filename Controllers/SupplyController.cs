@@ -41,6 +41,7 @@ namespace clinical.APIs.Controllers
                 Category = s.Category,
                 Unit = s.Unit,
                 Quantity = s.Quantity,
+                Description = s.Description,
                 StockTransactions = s.StockTransactions?.Select(st => new StockTransactionBasicInfo
                 {
                     T_ID = st.T_ID,
@@ -76,6 +77,7 @@ namespace clinical.APIs.Controllers
                 Category = supply.Category,
                 Unit = supply.Unit,
                 Quantity = supply.Quantity,
+                Description = supply.Description,
                 StockTransactions = supply.StockTransactions?.Select(st => new StockTransactionBasicInfo
                 {
                     T_ID = st.T_ID,
@@ -112,6 +114,7 @@ namespace clinical.APIs.Controllers
                 Category = s.Category,
                 Unit = s.Unit,
                 Quantity = s.Quantity,
+                Description = s.Description,
                 StockTransactions = s.StockTransactions?.Select(st => new StockTransactionBasicInfo
                 {
                     T_ID = st.T_ID,
@@ -145,7 +148,8 @@ namespace clinical.APIs.Controllers
                 Supply_Name = s.Supply_Name,
                 Category = s.Category,
                 Unit = s.Unit,
-                Quantity = s.Quantity
+                Quantity = s.Quantity,
+                Description = s.Description
             }).ToList();
 
             return Ok(response);
@@ -186,7 +190,8 @@ namespace clinical.APIs.Controllers
                     Supply_Name = supply.Supply_Name,
                     Category = supply.Category,
                     Unit = supply.Unit,
-                    Quantity = supply.Quantity
+                    Quantity = supply.Quantity,
+                    Description = supply.Description
                 };
 
                 return CreatedAtAction(nameof(GetSupplyById), new { Supply_ID = supply.Supply_ID }, response);
@@ -240,6 +245,7 @@ namespace clinical.APIs.Controllers
                 existingSupply.Category = supply.Category;
                 existingSupply.Unit = supply.Unit;
                 existingSupply.Quantity = supply.Quantity;
+                existingSupply.Description = supply.Description;
 
                 _context.Supplies.Update(existingSupply);
                 await _context.SaveChangesAsync();
@@ -250,7 +256,8 @@ namespace clinical.APIs.Controllers
                     Supply_Name = existingSupply.Supply_Name,
                     Category = existingSupply.Category,
                     Unit = existingSupply.Unit,
-                    Quantity = existingSupply.Quantity
+                    Quantity = existingSupply.Quantity,
+                    Description = existingSupply.Description
                 };
 
                 return Ok(new { message = "Supply updated successfully.", supply = response });

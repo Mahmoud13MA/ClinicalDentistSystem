@@ -80,7 +80,8 @@ namespace clinical.APIs.Controllers
                     Middle = request.Middle,
                     Last = request.Last,
                     Gender = request.Gender,
-                    DOB = request.DOB
+                    DOB = request.DOB,
+                    Phone = request.Phone
                 };
 
                 _context.Patients.Add(patient);
@@ -137,6 +138,7 @@ namespace clinical.APIs.Controllers
                 existingPatient.Last = request.Last;
                 existingPatient.Gender = request.Gender;
                 existingPatient.DOB = request.DOB;
+                existingPatient.Phone = request.Phone;
 
                 _context.Patients.Update(existingPatient);
                 await _context.SaveChangesAsync();

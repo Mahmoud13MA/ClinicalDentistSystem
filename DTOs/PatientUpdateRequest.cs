@@ -24,5 +24,9 @@ namespace clinical.APIs.DTOs
 
         [Required(ErrorMessage = "Date of birth is required")]
         public DateTime DOB { get; set; }
+
+        [StringLength(20)]
+        [Phone]
+        public string? Phone { get; set; }
     }
 }
