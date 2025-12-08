@@ -15,11 +15,13 @@ namespace clinical.APIs.Controllers
     {
         private readonly AppDbContext _context;
         private readonly INurseMappingService _mappingService;
+        private readonly IPasswordHashService _passwordHashService;
 
-        public NurseController(AppDbContext context, INurseMappingService mappingService)
+        public NurseController(AppDbContext context, INurseMappingService mappingService, IPasswordHashService passwordHashService)
         {
             _context = context;
             _mappingService = mappingService;
+            _passwordHashService = passwordHashService;
         }
 
         // GET: /Nurse
@@ -56,9 +58,9 @@ namespace clinical.APIs.Controllers
         // POST: /Nurse
         [Authorize(Policy = "DoctorOnly")]
         [HttpPost]
-        public async Task<IActionResult> CreateNurse([FromBody] Nurse nurse)
+        public async Task<IActionResult> CreateNurse([FromBody] NurseCreateRequest request)
         {
-            if (nurse == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Nurse data is required.", hint = "Make sure you're sending a valid JSON body with nurse information." });
             }
@@ -74,12 +76,27 @@ namespace clinical.APIs.Controllers
                 {
                     error = "Validation failed",
                     details = errors,
-                    hint = "Required fields: Name, Phone"
+                    hint = "Required fields: Name, Phone, Email, Password (minimum 8 characters)"
                 });
             }
 
             try
             {
+                // Check if email already exists
+                var emailExists = await _context.Nurses.AnyAsync(n => n.Email == request.Email);
+                if (emailExists)
+                {
+                    return BadRequest(new { error = "Email already registered." });
+                }
+
+                var nurse = new Nurse
+                {
+                    Name = request.Name,
+                    Phone = request.Phone,
+                    Email = request.Email,
+                    PasswordHash = _passwordHashService.HashPassword(request.Password)
+                };
+
                 _context.Nurses.Add(nurse);
                 await _context.SaveChangesAsync();
 
@@ -129,6 +146,17 @@ namespace clinical.APIs.Controllers
                 if (existingNurse == null)
                 {
                     return NotFound(new { error = "Nurse not found.", nurse_ID = NURSE_ID });
+                }
+
+                // Check if email is being changed and if new email already exists
+                if (existingNurse.Email != request.Email)
+                {
+                    var emailExists = await _context.Nurses
+                        .AnyAsync(n => n.Email == request.Email && n.NURSE_ID != NURSE_ID);
+                    if (emailExists)
+                    {
+                        return BadRequest(new { error = "Email already in use by another nurse." });
+                    }
                 }
 
                 // Update nurse properties

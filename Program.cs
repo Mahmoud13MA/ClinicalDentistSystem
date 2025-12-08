@@ -34,6 +34,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Add JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
 
+// Add Password Hashing Service
+builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
+
 // Add Mapping Services
 builder.Services.AddScoped<IAppointmentMappingService, AppointmentMappingService>();
 builder.Services.AddScoped<IStockTransactionMappingService, StockTransactionMappingService>();

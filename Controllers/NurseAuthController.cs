@@ -1,11 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
 using clinical.APIs.Data;
+using clinical.APIs.DTOs;
 using clinical.APIs.Models;
 using clinical.APIs.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
-using clinical.APIs.DTOs;
 
 namespace clinical.APIs.Controllers
 {
@@ -15,14 +14,17 @@ namespace clinical.APIs.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IJwtService _jwtService;
+        private readonly IPasswordHashService _passwordHashService;
 
-        public NurseAuthController(AppDbContext context, IJwtService jwtService)
+        public NurseAuthController(AppDbContext context, IJwtService jwtService, IPasswordHashService passwordHashService)
         {
             _context = context;
             _jwtService = jwtService;
+            _passwordHashService = passwordHashService;
         }
 
         // POST: api/NurseAuth/Register
+        [Authorize(Policy = "DoctorOnly")]
         [HttpPost("Register")]
         public async Task<IActionResult> Register([FromBody] NurseRegisterRequest request)
         {
@@ -60,7 +62,7 @@ namespace clinical.APIs.Controllers
                     Name = request.Name,
                     Phone = request.Phone,
                     Email = request.Email,
-                    PasswordHash = HashPassword(request.Password)
+                    PasswordHash = _passwordHashService.HashPassword(request.Password)
                 };
 
                 _context.Nurses.Add(nurse);
@@ -110,7 +112,7 @@ namespace clinical.APIs.Controllers
             try
             {
                 var nurse = await _context.Nurses.FirstOrDefaultAsync(n => n.Email == request.Email);
-                if (nurse == null || !VerifyPassword(request.Password, nurse.PasswordHash))
+                if (nurse == null || !_passwordHashService.VerifyPassword(request.Password, nurse.PasswordHash))
                 {
                     return Unauthorized(new { error = "Invalid email or password." });
                 }
@@ -131,21 +133,6 @@ namespace clinical.APIs.Controllers
                 var innerMessage = ex.InnerException?.Message ?? ex.Message;
                 return StatusCode(500, new { error = "Internal server error", message = innerMessage });
             }
-        }
-
-        private string HashPassword(string password)
-        {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                return Convert.ToBase64String(hashedBytes);
-            }
-        }
-
-        private bool VerifyPassword(string password, string hashedPassword)
-        {
-            var hashOfInput = HashPassword(password);
-            return hashOfInput == hashedPassword;
         }
     }
 }

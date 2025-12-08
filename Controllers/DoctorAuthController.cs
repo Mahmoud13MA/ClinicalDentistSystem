@@ -3,8 +3,6 @@ using clinical.APIs.Data;
 using clinical.APIs.Models;
 using clinical.APIs.Services;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
 using clinical.APIs.DTOs;
 
 namespace clinical.APIs.Controllers
@@ -15,11 +13,13 @@ namespace clinical.APIs.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IJwtService _jwtService;
+        private readonly IPasswordHashService _passwordHashService;
 
-        public DoctorAuthController(AppDbContext context, IJwtService jwtService)
+        public DoctorAuthController(AppDbContext context, IJwtService jwtService, IPasswordHashService passwordHashService)
         {
             _context = context;
             _jwtService = jwtService;
+            _passwordHashService = passwordHashService;
         }
 
         // POST: api/DoctorAuth/Register
@@ -60,7 +60,7 @@ namespace clinical.APIs.Controllers
                     Name = request.Name,
                     Phone = request.Phone,
                     Email = request.Email,
-                    PasswordHash = HashPassword(request.Password)
+                    PasswordHash = _passwordHashService.HashPassword(request.Password)
                 };
 
                 _context.Doctors.Add(doctor);
@@ -110,7 +110,7 @@ namespace clinical.APIs.Controllers
             try
             {
                 var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Email == request.Email);
-                if (doctor == null || !VerifyPassword(request.Password, doctor.PasswordHash))
+                if (doctor == null || !_passwordHashService.VerifyPassword(request.Password, doctor.PasswordHash))
                 {
                     return Unauthorized(new { error = "Invalid email or password." });
                 }
@@ -131,21 +131,6 @@ namespace clinical.APIs.Controllers
                 var innerMessage = ex.InnerException?.Message ?? ex.Message;
                 return StatusCode(500, new { error = "Internal server error", message = innerMessage });
             }
-        }
-
-        private string HashPassword(string password)
-        {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                return Convert.ToBase64String(hashedBytes);
-            }
-        }
-
-        private bool VerifyPassword(string password, string hashedPassword)
-        {
-            var hashOfInput = HashPassword(password);
-            return hashOfInput == hashedPassword;
         }
     }
 }
