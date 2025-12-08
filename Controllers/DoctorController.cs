@@ -1,5 +1,7 @@
 using clinical.APIs.Data;
 using clinical.APIs.Models;
+using clinical.APIs.DTOs;
+using clinical.APIs.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,16 +9,17 @@ using Microsoft.EntityFrameworkCore;
 namespace clinical.APIs.Controllers
 {
     [Authorize(Policy ="DoctorOnly")]
-
     [ApiController]
     [Route("[controller]")]
     public class DoctorController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IDoctorMappingService _mappingService;
 
-        public DoctorController(AppDbContext context)
+        public DoctorController(AppDbContext context, IDoctorMappingService mappingService)
         {
             _context = context;
+            _mappingService = mappingService;
         }
 
         [HttpGet]
@@ -28,7 +31,9 @@ namespace clinical.APIs.Controllers
             {
                 return NotFound();
             }
-            return Ok(doctors);
+
+            var response = _mappingService.MapToResponseList(doctors);
+            return Ok(response);
         }
 
         [HttpGet("{ID}")]
@@ -39,7 +44,9 @@ namespace clinical.APIs.Controllers
             {
                 return NotFound();
             }
-            return Ok(doctor);
+
+            var response = _mappingService.MapToResponse(doctor);
+            return Ok(response);
         }
 
         [HttpPost]
@@ -69,7 +76,9 @@ namespace clinical.APIs.Controllers
             {
                 _context.Doctors.Add(doctor);
                 await _context.SaveChangesAsync();
-                return CreatedAtAction(nameof(GetDoctorById), new { ID = doctor.ID }, doctor);
+
+                var response = _mappingService.MapToResponse(doctor);
+                return CreatedAtAction(nameof(GetDoctorById), new { ID = doctor.ID }, response);
             }
             catch (Exception ex)
             {
@@ -78,14 +87,14 @@ namespace clinical.APIs.Controllers
         }
 
         [HttpPut("{ID}")]
-        public async Task<IActionResult> UpdateDoctor(int ID, [FromBody] Doctor doctor)
+        public async Task<IActionResult> UpdateDoctor(int ID, [FromBody] DoctorUpdateRequest request)
         {
-            if (doctor == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Doctor data is required." });
             }
 
-            if (ID != doctor.ID)
+            if (ID != request.ID)
             {
                 return BadRequest(new { error = "Doctor ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
@@ -114,13 +123,15 @@ namespace clinical.APIs.Controllers
                 }
 
                 // Update doctor properties
-                existingDoctor.Name = doctor.Name;
-                existingDoctor.Phone = doctor.Phone;
+                existingDoctor.Name = request.Name;
+                existingDoctor.Phone = request.Phone;
+                existingDoctor.Email = request.Email;
 
                 _context.Doctors.Update(existingDoctor);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Doctor updated successfully.", doctor = existingDoctor });
+                var response = _mappingService.MapToResponse(existingDoctor);
+                return Ok(new { message = "Doctor updated successfully.", doctor = response });
             }
             catch (DbUpdateConcurrencyException)
             {
