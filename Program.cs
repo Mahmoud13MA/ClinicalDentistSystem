@@ -34,6 +34,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Add JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
 
+// Add Mapping Services
+builder.Services.AddScoped<IAppointmentMappingService, AppointmentMappingService>();
+builder.Services.AddScoped<IStockTransactionMappingService, StockTransactionMappingService>();
+builder.Services.AddScoped<IEHRMappingService, EHRMappingService>();
+builder.Services.AddScoped<IPatientMappingService, PatientMappingService>();
+builder.Services.AddScoped<IDoctorMappingService, DoctorMappingService>();
+builder.Services.AddScoped<INurseMappingService, NurseMappingService>();
+
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"];

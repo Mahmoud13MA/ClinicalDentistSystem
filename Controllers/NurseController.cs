@@ -1,5 +1,7 @@
 using clinical.APIs.Data;
 using clinical.APIs.Models;
+using clinical.APIs.DTOs;
+using clinical.APIs.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +14,12 @@ namespace clinical.APIs.Controllers
     public class NurseController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly INurseMappingService _mappingService;
 
-        public NurseController(AppDbContext context)
+        public NurseController(AppDbContext context, INurseMappingService mappingService)
         {
             _context = context;
+            _mappingService = mappingService;
         }
 
         // GET: /Nurse
@@ -23,35 +27,34 @@ namespace clinical.APIs.Controllers
         [Route("")]
         public async Task<IActionResult> GetNurses()
         {
-            var nurses = await _context.Nurses
-                .Include(n => n.Appointments)
-                .ToListAsync();
+            var nurses = await _context.Nurses.ToListAsync();
 
             if (nurses == null || nurses.Count == 0)
             {
                 return NotFound(new { message = "No nurses found." });
             }
 
-            return Ok(nurses);
+            var response = _mappingService.MapToResponseList(nurses);
+            return Ok(response);
         }
 
         // GET: /Nurse/{id}
         [HttpGet("{NURSE_ID}")]
         public async Task<IActionResult> GetNurseById(int NURSE_ID)
         {
-            var nurse = await _context.Nurses
-                .Include(n => n.Appointments)
-                .FirstOrDefaultAsync(n => n.NURSE_ID == NURSE_ID);
+            var nurse = await _context.Nurses.FirstOrDefaultAsync(n => n.NURSE_ID == NURSE_ID);
 
             if (nurse == null)
             {
                 return NotFound(new { error = "Nurse not found.", nurse_ID = NURSE_ID });
             }
 
-            return Ok(nurse);
+            var response = _mappingService.MapToResponse(nurse);
+            return Ok(response);
         }
 
         // POST: /Nurse
+        [Authorize(Policy = "DoctorOnly")]
         [HttpPost]
         public async Task<IActionResult> CreateNurse([FromBody] Nurse nurse)
         {
@@ -80,7 +83,8 @@ namespace clinical.APIs.Controllers
                 _context.Nurses.Add(nurse);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction(nameof(GetNurseById), new { NURSE_ID = nurse.NURSE_ID }, nurse);
+                var response = _mappingService.MapToResponse(nurse);
+                return CreatedAtAction(nameof(GetNurseById), new { NURSE_ID = nurse.NURSE_ID }, response);
             }
             catch (Exception ex)
             {
@@ -92,14 +96,14 @@ namespace clinical.APIs.Controllers
         // PUT: /Nurse/{id}
         [Authorize(Policy = "DoctorOnly")]
         [HttpPut("{NURSE_ID}")]
-        public async Task<IActionResult> UpdateNurse(int NURSE_ID, [FromBody] Nurse nurse)
+        public async Task<IActionResult> UpdateNurse(int NURSE_ID, [FromBody] NurseUpdateRequest request)
         {
-            if (nurse == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Nurse data is required." });
             }
 
-            if (NURSE_ID != nurse.NURSE_ID)
+            if (NURSE_ID != request.NURSE_ID)
             {
                 return BadRequest(new { error = "Nurse ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
@@ -128,13 +132,15 @@ namespace clinical.APIs.Controllers
                 }
 
                 // Update nurse properties
-                existingNurse.Name = nurse.Name;
-                existingNurse.Phone = nurse.Phone;
+                existingNurse.Name = request.Name;
+                existingNurse.Phone = request.Phone;
+                existingNurse.Email = request.Email;
 
                 _context.Nurses.Update(existingNurse);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Nurse updated successfully.", nurse = existingNurse });
+                var response = _mappingService.MapToResponse(existingNurse);
+                return Ok(new { message = "Nurse updated successfully.", nurse = response });
             }
             catch (DbUpdateConcurrencyException)
             {

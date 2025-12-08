@@ -1,5 +1,7 @@
 ﻿using clinical.APIs.Data;
 using clinical.APIs.Models;
+using clinical.APIs.DTOs;
+using clinical.APIs.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +14,12 @@ namespace clinical.APIs.Controllers
     public class PatientController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IPatientMappingService _mappingService;
 
-        public PatientController(AppDbContext context)
+        public PatientController(AppDbContext context, IPatientMappingService mappingService)
         {
             _context = context;
+            _mappingService = mappingService;
         }
 
         [HttpGet]
@@ -26,9 +30,10 @@ namespace clinical.APIs.Controllers
             if (patients == null || patients.Count == 0)
             {
                 return NotFound();
-
             }
-            return Ok(patients);
+
+            var response = _mappingService.MapToResponseList(patients);
+            return Ok(response);
         }
 
         [HttpGet("{Patient_ID}")]
@@ -39,12 +44,15 @@ namespace clinical.APIs.Controllers
             {
                 return NotFound();
             }
-            return Ok(patient);
+
+            var response = _mappingService.MapToResponse(patient);
+            return Ok(response);
         }
+
         [HttpPost]
-        public async Task<IActionResult> CreatePatient([FromBody] Patient patient)
+        public async Task<IActionResult> CreatePatient([FromBody] PatientCreateRequest request)
         {
-            if (patient == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Patient data is required.", hint = "Make sure you're sending a valid JSON body with patient information." });
             }
@@ -66,9 +74,20 @@ namespace clinical.APIs.Controllers
 
             try
             {
+                var patient = new Patient
+                {
+                    First = request.First,
+                    Middle = request.Middle,
+                    Last = request.Last,
+                    Gender = request.Gender,
+                    DOB = request.DOB
+                };
+
                 _context.Patients.Add(patient);
                 await _context.SaveChangesAsync();
-                return CreatedAtAction(nameof(GetPatientById), new { Patient_ID = patient.Patient_ID }, patient);
+
+                var response = _mappingService.MapToResponse(patient);
+                return CreatedAtAction(nameof(GetPatientById), new { Patient_ID = patient.Patient_ID }, response);
             }
             catch (Exception ex)
             {
@@ -77,14 +96,14 @@ namespace clinical.APIs.Controllers
         }
 
         [HttpPut("{Patient_ID}")]
-        public async Task<IActionResult> UpdatePatient(int Patient_ID, [FromBody] Patient patient)
+        public async Task<IActionResult> UpdatePatient(int Patient_ID, [FromBody] PatientUpdateRequest request)
         {
-            if (patient == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Patient data is required." });
             }
 
-            if (Patient_ID != patient.Patient_ID)
+            if (Patient_ID != request.Patient_ID)
             {
                 return BadRequest(new { error = "Patient ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
@@ -113,16 +132,17 @@ namespace clinical.APIs.Controllers
                 }
 
                 // Update patient properties
-                existingPatient.First = patient.First;
-                existingPatient.Middle = patient.Middle;
-                existingPatient.Last = patient.Last;
-                existingPatient.Gender = patient.Gender;
-                existingPatient.DOB = patient.DOB;
+                existingPatient.First = request.First;
+                existingPatient.Middle = request.Middle;
+                existingPatient.Last = request.Last;
+                existingPatient.Gender = request.Gender;
+                existingPatient.DOB = request.DOB;
 
                 _context.Patients.Update(existingPatient);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Patient updated successfully.", patient = existingPatient });
+                var response = _mappingService.MapToResponse(existingPatient);
+                return Ok(new { message = "Patient updated successfully.", patient = response });
             }
             catch (DbUpdateConcurrencyException)
             {

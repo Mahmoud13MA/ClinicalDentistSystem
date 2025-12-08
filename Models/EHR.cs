@@ -9,10 +9,10 @@ namespace clinical.APIs.Models
         [Key]
         public int EHR_ID { get; set; }
 
-        public string Medications { get; set; }
-        public string Allergies { get; set; }
-        public string History { get; set; }
-        public string Treatments { get; set; }
+        public string? Medications { get; set; }
+        public string? Allergies { get; set; }
+        public string? History { get; set; }
+        public string? Treatments { get; set; }
         public DateTime Last_Updated { get; set; }
 
         // -----------------------------
@@ -21,10 +21,10 @@ namespace clinical.APIs.Models
 
         [ForeignKey(nameof(Patient))]
         public int Patient_ID { get; set; }
-        public Patient Patient { get; set; }
+        public Patient? Patient { get; set; }
 
         [ForeignKey(nameof(Appointment))]
         public int AppointmentId { get; set; }
-        public Appointment Appointment { get; set; }
+        public Appointment? Appointment { get; set; }
     }
 }
