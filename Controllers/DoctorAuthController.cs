@@ -4,6 +4,7 @@ using clinical.APIs.Models;
 using clinical.APIs.Services;
 using Microsoft.EntityFrameworkCore;
 using clinical.APIs.DTOs;
+using Microsoft.Extensions.Configuration;
 
 namespace clinical.APIs.Controllers
 {
@@ -14,12 +15,18 @@ namespace clinical.APIs.Controllers
         private readonly AppDbContext _context;
         private readonly IJwtService _jwtService;
         private readonly IPasswordHashService _passwordHashService;
+        private readonly IConfiguration _configuration;
 
-        public DoctorAuthController(AppDbContext context, IJwtService jwtService, IPasswordHashService passwordHashService)
+        public DoctorAuthController(
+            AppDbContext context, 
+            IJwtService jwtService, 
+            IPasswordHashService passwordHashService,
+            IConfiguration configuration)
         {
             _context = context;
             _jwtService = jwtService;
             _passwordHashService = passwordHashService;
+            _configuration = configuration;
         }
 
         // POST: api/DoctorAuth/Register
@@ -47,6 +54,19 @@ namespace clinical.APIs.Controllers
 
             try
             {
+                // Validate registration key
+                var validRegistrationKey = _configuration["RegistrationSettings:DoctorRegistrationKey"];
+                
+                if (string.IsNullOrEmpty(validRegistrationKey))
+                {
+                    return StatusCode(500, new { error = "Server configuration error. Contact system administrator." });
+                }
+
+                if (request.RegistrationKey != validRegistrationKey)
+                {
+                    return Unauthorized(new { error = "Invalid registration key. Contact your clinic administrator for the correct key." });
+                }
+
                 // Check if email already exists
                 var existingDoctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Email == request.Email);
                 if (existingDoctor != null)

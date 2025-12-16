@@ -17,5 +17,8 @@ namespace clinical.APIs.DTOs
         [Required]
         [MinLength(6)]
         public string Password { get; set; }
+
+        [Required(ErrorMessage = "Registration key is required")]
+        public string RegistrationKey { get; set; }
     }
 }

@@ -2,7 +2,6 @@ using clinical.APIs.Data;
 using clinical.APIs.DTOs;
 using clinical.APIs.Models;
 using clinical.APIs.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,16 +14,21 @@ namespace clinical.APIs.Controllers
         private readonly AppDbContext _context;
         private readonly IJwtService _jwtService;
         private readonly IPasswordHashService _passwordHashService;
+        private readonly IConfiguration _configuration;
 
-        public NurseAuthController(AppDbContext context, IJwtService jwtService, IPasswordHashService passwordHashService)
+        public NurseAuthController(
+            AppDbContext context, 
+            IJwtService jwtService, 
+            IPasswordHashService passwordHashService,
+            IConfiguration configuration)
         {
             _context = context;
             _jwtService = jwtService;
             _passwordHashService = passwordHashService;
+            _configuration = configuration;
         }
 
         // POST: api/NurseAuth/Register
-        [Authorize(Policy = "DoctorOnly")]
         [HttpPost("Register")]
         public async Task<IActionResult> Register([FromBody] NurseRegisterRequest request)
         {
@@ -49,6 +53,19 @@ namespace clinical.APIs.Controllers
 
             try
             {
+                // Validate registration key
+                var validRegistrationKey = _configuration["RegistrationSettings:NurseRegistrationKey"];
+                
+                if (string.IsNullOrEmpty(validRegistrationKey))
+                {
+                    return StatusCode(500, new { error = "Server configuration error. Contact system administrator." });
+                }
+
+                if (request.RegistrationKey != validRegistrationKey)
+                {
+                    return Unauthorized(new { error = "Invalid registration key. Contact your clinic administrator for the correct key." });
+                }
+
                 // Check if email already exists
                 var existingNurse = await _context.Nurses.FirstOrDefaultAsync(n => n.Email == request.Email);
                 if (existingNurse != null)
