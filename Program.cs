@@ -4,26 +4,53 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Get connection string
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-Console.WriteLine($"Using connection string: {connectionString}");
+// Configure Kestrel with fallback ports if primary ports are in use
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    var httpPort = FindAvailablePort(5107);
+    var httpsPort = FindAvailablePort(7044);
+    
+    serverOptions.Listen(IPAddress.Loopback, httpPort);
+    serverOptions.Listen(IPAddress.Loopback, httpsPort, listenOptions =>
+    {
+        listenOptions.UseHttps();
+    });
+    
+    if (httpPort != 5107 || httpsPort != 7044)
+    {
+        Console.WriteLine($"⚠ Using alternate ports - HTTP: {httpPort}, HTTPS: {httpsPort}");
+    }
+});
 
-// Add DbContext with retry on failure
+static int FindAvailablePort(int startPort)
+{
+    for (int port = startPort; port < startPort + 100; port++)
+    {
+        try
+        {
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Bind(new IPEndPoint(IPAddress.Loopback, port));
+            return port;
+        }
+        catch (SocketException) { }
+    }
+    throw new InvalidOperationException($"No available ports found starting from {startPort}");
+}
+
+// Configure services
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlServer(connectionString, sqlOptions =>
-    {
-        sqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(30),
-            errorNumbersToAdd: null);
-    });
+        sqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null));
     
-    // Enable detailed logging for development
     if (builder.Environment.IsDevelopment())
     {
         options.EnableSensitiveDataLogging();
@@ -31,25 +58,21 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
 });
 
-// Add CORS Configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowNextJs", policy =>
-    {
         policy.WithOrigins("http://localhost:3000", "https://localhost:3000")
               .AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowCredentials();
-    });
+              .AllowCredentials());
 });
 
-// Add JWT Service
+// Core services
 builder.Services.AddScoped<IJwtService, JwtService>();
-
-// Add Password Hashing Service
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
+builder.Services.AddScoped<IEHRChangeLogService, EHRChangeLogService>();
 
-// Add Mapping Services
+// Mapping services
 builder.Services.AddScoped<IAppointmentMappingService, AppointmentMappingService>();
 builder.Services.AddScoped<IStockTransactionMappingService, StockTransactionMappingService>();
 builder.Services.AddScoped<IEHRMappingService, EHRMappingService>();
@@ -57,12 +80,14 @@ builder.Services.AddScoped<IPatientMappingService, PatientMappingService>();
 builder.Services.AddScoped<IDoctorMappingService, DoctorMappingService>();
 builder.Services.AddScoped<INurseMappingService, NurseMappingService>();
 
-// Add EHR Change Log Service
-builder.Services.AddScoped<IEHRChangeLogService, EHRChangeLogService>();
+// AI services
+builder.Services.AddHttpClient<ILlamaService, LlamaService>();
+builder.Services.AddScoped<ILlamaService, LlamaService>();
+builder.Services.AddSingleton<OllamaManager>();
 
-// Configure JWT Authentication
+// JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"];
+var secretKey = jwtSettings["SecretKey"]!;
 
 builder.Services.AddAuthentication(options =>
 {
@@ -93,7 +118,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddControllers();
 
-// Configure Swagger/OpenAPI with JWT support
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -101,7 +126,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Clinical Dentist System API",
         Version = "v1",
-        Description = "API for Clinical Dentist Management System with JWT Authentication"
+        Description = "API for Clinical Dentist Management System with JWT Authentication and AI-Powered EHR Assistance"
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -111,56 +136,42 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your JWT token. Example: 'Bearer eyJhbGc...'"
+        Description = "Enter 'Bearer' [space] and then your JWT token"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[] {}
+            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+            Array.Empty<string>()
         }
     });
 });
 
 var app = builder.Build();
 
+// Start Ollama (simplified - just 2 lines!)
+var ollama = app.Services.GetRequiredService<OllamaManager>();
+await ollama.StartWithFallbackAsync();
+
 // Initialize database
 using (var scope = app.Services.CreateScope())
 {
-    var services = scope.ServiceProvider;
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        var context = services.GetRequiredService<AppDbContext>();
-        
-        Console.WriteLine("Attempting to connect to database...");
-        
-        // Create database and apply all migrations
+        Console.WriteLine("Initializing database...");
         context.Database.Migrate();
-        
-        Console.WriteLine("✓ Database created/updated successfully!");
-        Console.WriteLine($"✓ Database: {context.Database.GetDbConnection().Database}");
-        Console.WriteLine($"✓ Server: {context.Database.GetDbConnection().DataSource}");
+        Console.WriteLine($"✓ Database ready: {context.Database.GetDbConnection().Database}");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Database initialization error: {ex.Message}");
-        Console.WriteLine("\nTroubleshooting steps:");
-        Console.WriteLine("  1. Ensure SQL Server LocalDB is installed");
-        Console.WriteLine("  2. Run 'sqllocaldb start mssqllocaldb' in command prompt");
-        Console.WriteLine("  3. Or install LocalDB from: https://aka.ms/sqlexpress");
-        Console.WriteLine($"\nFull error details:\n{ex}");
+        Console.WriteLine($"✗ Database error: {ex.Message}");
+        Console.WriteLine("Install SQL Server LocalDB: https://aka.ms/sqlexpress");
     }
 }
 
-// Configure the HTTP request pipeline.
+// Configure pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -168,12 +179,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseCors("AllowNextJs");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
+
+// Cleanup on shutdown
+app.Lifetime.ApplicationStopping.Register(ollama.Stop);
 
 app.Run();
