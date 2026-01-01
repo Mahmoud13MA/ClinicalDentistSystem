@@ -5,9 +5,10 @@ name: .NET
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+    branches:
+      - master
+    paths-ignore:
+      - 'Tests/**'
 
 jobs:
   build:
