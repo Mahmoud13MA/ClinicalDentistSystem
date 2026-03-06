@@ -166,7 +166,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Database error: {ex.Message}");
+        Console.WriteLine($"Database error: {ex.Message}");
         Console.WriteLine("Install SQL Server LocalDB: https://aka.ms/sqlexpress");
     }
 }

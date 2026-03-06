@@ -9,9 +9,8 @@ namespace clinical.APIs.Models
         public int ToothRecord_ID { get; set; }
 
         [Required]
-        [Range(1, 32)]
-        public int ToothNumber { get; set; }           // 1–32 (Universal Numbering System)
-        
+        [Range(11, 48)]
+        public int ToothNumber { get; set; }           
         public string? Condition { get; set; }         // Caries, Missing, Fractured, Healthy
         public string? TreatmentPlanned { get; set; }
         public string? TreatmentCompleted { get; set; }

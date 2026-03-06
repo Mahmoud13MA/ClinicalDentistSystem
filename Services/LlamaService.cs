@@ -32,7 +32,7 @@ namespace clinical.APIs.Services
             _topK = int.Parse(_configuration["LlamaSettings:TopK"] ?? "40");
             _contextLength = int.Parse(_configuration["LlamaSettings:ContextLength"] ?? "4096");
             _repeatPenalty = double.Parse(_configuration["LlamaSettings:RepeatPenalty"] ?? "1.1");
-            _gpuLayers = int.Parse(_configuration["LlamaSettings:GpuLayers"] ?? "20");
+            _gpuLayers = int.Parse(_configuration["LlamaSettings:GpuLayers"] ?? "30");
             
             _stopSequences = _configuration.GetSection("LlamaSettings:Stop").Get<List<string>>() 
                 ?? new List<string> { "###", "User:", "Assistant:" };
