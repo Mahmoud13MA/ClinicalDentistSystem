@@ -1,5 +1,7 @@
-﻿using clinical.APIs.Data;
-using clinical.APIs.Services;
+﻿using clinical.APIs.Modules.DentalClinic.Services;
+using clinical.APIs.Modules.DentalClinic;
+using clinical.APIs.Shared.Data;
+using clinical.APIs.Shared.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -72,18 +74,10 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
 builder.Services.AddScoped<IEHRChangeLogService, EHRChangeLogService>();
 
-// Mapping services
-builder.Services.AddScoped<IAppointmentMappingService, AppointmentMappingService>();
-builder.Services.AddScoped<IStockTransactionMappingService, StockTransactionMappingService>();
-builder.Services.AddScoped<IEHRMappingService, EHRMappingService>();
-builder.Services.AddScoped<IPatientMappingService, PatientMappingService>();
-builder.Services.AddScoped<IDoctorMappingService, DoctorMappingService>();
-builder.Services.AddScoped<INurseMappingService, NurseMappingService>();
+// Module services
+builder.Services.AddDentalClinicModule();
 
-// AI services
-builder.Services.AddHttpClient<ILlamaService, LlamaService>();
-builder.Services.AddScoped<ILlamaService, LlamaService>();
-builder.Services.AddSingleton<OllamaManager>();
+
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
