@@ -4,10 +4,8 @@ namespace clinical.APIs.Modules.DentalClinic
 {
     public static class DentalClinicModule
     {
-
         public static IServiceCollection AddDentalClinicModule(this IServiceCollection services)
         { 
-
             // Mappings
             services.AddScoped<IEHRChangeLogService, EHRChangeLogService>();
             services.AddScoped<IEHRMappingService, EHRMappingService>();
@@ -19,19 +17,9 @@ namespace clinical.APIs.Modules.DentalClinic
 
             // AI
             services.AddHttpClient<ILlamaService, LlamaService>();
-            services.AddScoped<ILlamaService, LlamaService>();
             services.AddSingleton<OllamaManager>();
-
-
 
             return services;
         }
-
-
-
-
-
-
-
     }
 }

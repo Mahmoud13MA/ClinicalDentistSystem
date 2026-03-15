@@ -22,6 +22,8 @@ namespace clinical.APIs.Shared.Data
         public DbSet<Supply> Supplies { get; set; }
         public DbSet<Stock_Transaction> StockTransactions { get; set; }
 
+        public DbSet<Admin> Admins { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
