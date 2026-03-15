@@ -14,7 +14,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AdminController : Controller
+    public class AdminController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly IPasswordHashService _passwordHashService;
@@ -28,7 +28,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             _jwtService = jwtService;
 
         }
-
 
         [HttpPost("Register")]
 
@@ -58,4 +57,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
         }
     }
+
+
 }
