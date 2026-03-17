@@ -12,7 +12,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
     [Authorize(Policy ="DoctorOnly")]
     [ApiController]
     [Route("[controller]")]
-    public class DoctorController : Controller
+    public class DoctorController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly IDoctorMappingService _mappingService;
