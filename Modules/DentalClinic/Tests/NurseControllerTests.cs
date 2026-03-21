@@ -8,6 +8,7 @@ using clinical.APIs.Modules.DentalClinic.Models;
 using clinical.APIs.Modules.DentalClinic.Services;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Security;
+using clinical.APIs.Shared.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -20,6 +21,7 @@ namespace clinical.APIs.Modules.DentalClinic.Tests
         private readonly DbContextOptions<AppDbContext> _options;
         private readonly Mock<INurseMappingService> _mappingMock;
         private readonly Mock<IPasswordHashService> _passwordMock;
+        private readonly Mock<IEmailValidationService> _emailValidationMock;
 
         public NurseControllerTests()
         {
@@ -30,12 +32,16 @@ namespace clinical.APIs.Modules.DentalClinic.Tests
 
             _mappingMock = new Mock<INurseMappingService>();
             _passwordMock = new Mock<IPasswordHashService>();
+            _emailValidationMock = new Mock<IEmailValidationService>();
+            // Setup default behaviour for mock to assume email is not used (true for unique check usually, but IsEmailUsedAsync returns true if used)
+            _emailValidationMock.Setup(m => m.IsEmailUsedAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int?>()))
+                .ReturnsAsync(false);
         }
 
         private AppDbContext CreateContext() => new AppDbContext(_options);
 
         private NurseController CreateController(AppDbContext ctx) =>
-            new NurseController(ctx, _mappingMock.Object, _passwordMock.Object);
+            new NurseController(ctx, _mappingMock.Object, _passwordMock.Object, _emailValidationMock.Object);
 
         [Fact]
         public async Task GetNurses_ReturnsNotFound_WhenNoNurses()
@@ -73,8 +79,10 @@ namespace clinical.APIs.Modules.DentalClinic.Tests
         public async Task CreateNurse_ReturnsBadRequest_WhenEmailAlreadyRegistered()
         {
             using var ctx = CreateContext();
-            ctx.Nurses.Add(new Nurse { NURSE_ID = 1, Name = "Existing", Email = "dupe@example.com", Phone = "000", PasswordHash = "existinghashed" });
-            await ctx.SaveChangesAsync();
+
+            // Tell the mock service to return TRUE (email is used) when checking "dupe@example.com"
+            _emailValidationMock.Setup(m => m.IsEmailUsedAsync("dupe@example.com", null, null, null))
+                                .ReturnsAsync(true);
 
             var controller = CreateController(ctx);
 

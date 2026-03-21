@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Security;
+using clinical.APIs.Shared.Services;
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using clinical.APIs.Modules.DentalClinic.Services;
 
@@ -17,12 +18,14 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         private readonly AppDbContext _context;
         private readonly IDoctorMappingService _mappingService;
         private readonly IPasswordHashService _passwordHashService;
+        private readonly IEmailValidationService _emailValidationService;
 
-        public DoctorController(AppDbContext context, IDoctorMappingService mappingService, IPasswordHashService passwordHashService)
+        public DoctorController(AppDbContext context, IDoctorMappingService mappingService, IPasswordHashService passwordHashService, IEmailValidationService emailValidationService)
         {
             _context = context;
             _mappingService = mappingService;
             _passwordHashService = passwordHashService;
+            _emailValidationService = emailValidationService;
         }
 
         [HttpGet]
@@ -78,7 +81,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             try
             {
                 // Check if email already exists
-                var emailExists = await _context.Doctors.AnyAsync(d => d.Email == request.Email);
+                var emailExists = await _emailValidationService.IsEmailUsedAsync(request.Email);
                 if (emailExists)
                 {
                     return BadRequest(new { error = "Email already registered." });
@@ -143,8 +146,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 // Check if email is being changed and if new email already exists
                 if (existingDoctor.Email != request.Email)
                 {
-                    var emailExists = await _context.Doctors
-                        .AnyAsync(d => d.Email == request.Email && d.ID != ID);
+                    var emailExists = await _emailValidationService.IsEmailUsedAsync(request.Email, doctorId: ID);
                     if (emailExists)
                     {
                         return BadRequest(new { error = "Email already in use by another doctor." });

@@ -6,9 +6,9 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
     {
         [Required]
         [EmailAddress]
-        string Email { get; set; }
-        [MinLength(6)]
-        string Password { get; set; }
+         public string Email { get; set; }
+       [MinLength(6)]
+       public string Password { get; set; }
 
 
     }

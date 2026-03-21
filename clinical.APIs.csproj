@@ -28,7 +28,7 @@
   <!-- Packages required for the in-repo tests in Tests/ -->
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
-    <PackageReference Include="Moq" Version="4.20.4" />
+    <PackageReference Include="Moq" Version="4.20.69" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />

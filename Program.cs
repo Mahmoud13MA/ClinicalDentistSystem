@@ -72,6 +72,7 @@ builder.Services.AddCors(options =>
 // Core services
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
+builder.Services.AddScoped<clinical.APIs.Shared.Services.IEmailValidationService, clinical.APIs.Shared.Services.EmailValidationService>();
 
 // Module services
 builder.Services.AddDentalClinicModule();

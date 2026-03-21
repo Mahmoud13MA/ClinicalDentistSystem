@@ -6,28 +6,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using Microsoft.AspNetCore.Authorization;
-
+using clinical.APIs.Shared.Services;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AdminController : ControllerBase
+    public class AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration, IEmailValidationService emailValidationService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IPasswordHashService _passwordHashService;
-        private readonly IJwtService _jwtService;
-        private readonly IConfiguration _configuration;
 
-
-        public AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration)
-        {
-            _configuration = configuration;
-            _context = context;
-            _passwordHashService = passwordHashService;
-            _jwtService = jwtService;
-
-        }
 
         [HttpPost("Register")]
 
@@ -38,32 +25,29 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var validRegistrationKey = _configuration["RegistrationSettings:AdminRegistrationKey"];
+            var validRegistrationKey = configuration["RegistrationSettings:AdminRegistrationKey"];
 
             if (request.AdminRegistrationKey != validRegistrationKey)
             {
                 return Unauthorized(new { error = "Invalid registration key." });
 
             }
-            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var exists = await emailValidationService.IsEmailUsedAsync(request.Email);
 
-            var exists = await _context.Admins.AnyAsync(a => a.Email == normalizedEmail);
-
-            if (exists) return BadRequest(new { error = "Email already registered." });
+            if (exists) return BadRequest(new { error = "Email already registered by a user." });
 
 
 
             var admin = new Admin
-            { Name = request.Name,
+            { 
+                Name = request.Name,
                 Email = request.Email,
-                PasswordHash = _passwordHashService.HashPassword(request.Password),
-
-
+                PasswordHash = passwordHashService.HashPassword(request.Password),
 
             };
-            _context.Admins.Add(admin);
-            await _context.SaveChangesAsync();
-            var token = _jwtService.GenerateToken(admin.Admin_ID, admin.Email, admin.Name, "Admin");
+            context.Admins.Add(admin);
+            await context.SaveChangesAsync();
+            var token = jwtService.GenerateToken(admin.Admin_ID, admin.Email, admin.Name, "Admin");
             return Ok(new { message = "Admin registered successfully.", adminId = admin.Admin_ID, token });
 
 
@@ -77,15 +61,15 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
 
-            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.Email == request.Email);
+            var admin = await context.Admins.FirstOrDefaultAsync(a => a.Email == request.Email);
 
-            if (admin == null || !_passwordHashService.VerifyPassword(request.Password, admin.PasswordHash))
+            if (admin == null || !passwordHashService.VerifyPassword(request.Password, admin.PasswordHash))
             {
                 return Unauthorized(new { error = "Invalid email or password." });
 
             }
 
-            var token = _jwtService.GenerateToken(admin.Admin_ID, admin.Email, admin.Name, "Admin");
+            var token = jwtService.GenerateToken(admin.Admin_ID, admin.Email, admin.Name, "Admin");
 
             return Ok(new { message = "Login successful", token });
 
@@ -94,20 +78,83 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
 
 
+        [Authorize(Policy ="Admin")]
+        [HttpPut("doctors/{id:int}/credentials")]
+
+        public async Task<IActionResult>DoctorUpdateCredentialsRequest([FromBody] UpdateCredentialsRequest request,int id)
+        {
+
+
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var doctor = await context.Doctors.FindAsync(id);
+            if (doctor == null) return BadRequest(new { error = "Doctor Not Found" });
+
+            if (!string.IsNullOrEmpty(request.Email))
+            {
+                var emailUsed = await emailValidationService.IsEmailUsedAsync(request.Email, doctorId: id);
+
+                if (emailUsed) return BadRequest(new { error = "Email already used by another user" });
+
+                doctor.Email = request.Email.Trim().ToLowerInvariant();
+            }
+                if (!string.IsNullOrEmpty(request.Password))
+                {
+
+                    doctor.PasswordHash=passwordHashService.HashPassword(request.Password);
+
+                }
+
+            
+
+            await context.SaveChangesAsync();
+
+            return Ok(new { message = "Doctor Credentials Updated " });
+
+            }
+
+        [Authorize(Policy = "Admin")]
+        [HttpPut("nurses/{id:int}/credntials")]
+        public async Task<IActionResult> NurseUpdateCredentialsRequest([FromBody]UpdateCredentialsRequest request,int id)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var nurse = await context.Nurses.FindAsync(id);
+            if (nurse == null) return BadRequest(new { error = "Nurse Not Found " });
+
+            if (!string.IsNullOrEmpty(request.Email)) {
+                var emailUsed = await emailValidationService.IsEmailUsedAsync(request.Email, nurseId: id);
+
+                if (emailUsed) return BadRequest(new { error = "Email already used by another user" });
+
+                nurse.Email = request.Email.Trim().ToLowerInvariant();
+            }
+
+
+            if (!string.IsNullOrEmpty(request.Password)) {
+
+                nurse.PasswordHash = passwordHashService.HashPassword(request.Password);
+            
+            }
+            await context.SaveChangesAsync();
+            return Ok(new { message = "Nurse Credentials Updated" });
+
+
+        }
+
 
         [Authorize(Policy = "Admin")]
         [HttpDelete("doctors /{id:int}/credentials")]
 
         public async Task<IActionResult> RemoveDoctorCrednetials(int id)
         {
-            var doctor = await _context.Doctors.FindAsync(id);
+            var doctor = await context.Doctors.FindAsync(id);
 
             if (doctor == null) return NotFound(new { error = "Doctor not found" });
 
 
             doctor.Email=string.Empty;
             doctor.PasswordHash=string.Empty;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
             return Ok(new {massage = "Doctor Cerdnetails removed . Doctor record kept"});
 
@@ -123,14 +170,14 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
         public async Task<IActionResult> RemoveNurseCrednetials(int id)
         {
-            var nurse = await _context.Doctors.FindAsync(id);
+            var nurse = await context.Nurses.FindAsync(id);
 
             if (nurse == null) return NotFound(new { error = "Nurse not found" });
 
 
             nurse.Email = string.Empty;
             nurse.PasswordHash = string.Empty;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
             return Ok(new { massage = "nurse Cerdnetails removed . nurse record kept" });
 
@@ -139,7 +186,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         }
 
 
-
+        
 
 
 
@@ -154,4 +201,10 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
 
 
+
+
 }
+
+
+
+
