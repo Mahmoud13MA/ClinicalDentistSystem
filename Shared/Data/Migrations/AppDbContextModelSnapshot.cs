@@ -186,9 +186,6 @@ namespace clinical.APIs.Shared.Data.Migrations
                     b.Property<int>("AppointmentId")
                         .HasColumnType("int");
 
-                    b.Property<int>("Appointment_ID")
-                        .HasColumnType("int");
-
                     b.Property<string>("ChangeType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -202,9 +199,6 @@ namespace clinical.APIs.Shared.Data.Migrations
                     b.Property<string>("ChangedByDoctorName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("DoctorId")
-                        .HasColumnType("int");
 
                     b.Property<int>("EHR_ID")
                         .HasColumnType("int");
@@ -221,9 +215,9 @@ namespace clinical.APIs.Shared.Data.Migrations
 
                     b.HasKey("ChangeLog_ID");
 
-                    b.HasIndex("Appointment_ID");
+                    b.HasIndex("AppointmentId");
 
-                    b.HasIndex("DoctorId");
+                    b.HasIndex("ChangedByDoctorId");
 
                     b.HasIndex("EHR_ID");
 
@@ -388,9 +382,6 @@ namespace clinical.APIs.Shared.Data.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("DoctorID")
-                        .HasColumnType("int");
-
                     b.Property<int>("Doctor_ID")
                         .HasColumnType("int");
 
@@ -404,8 +395,6 @@ namespace clinical.APIs.Shared.Data.Migrations
                         .HasColumnType("time");
 
                     b.HasKey("T_ID");
-
-                    b.HasIndex("DoctorID");
 
                     b.HasIndex("Doctor_ID");
 
@@ -574,13 +563,13 @@ namespace clinical.APIs.Shared.Data.Migrations
                 {
                     b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Appointment", "Appointment")
                         .WithMany()
-                        .HasForeignKey("Appointment_ID")
+                        .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", "Doctor")
                         .WithMany()
-                        .HasForeignKey("DoctorId")
+                        .HasForeignKey("ChangedByDoctorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -621,12 +610,8 @@ namespace clinical.APIs.Shared.Data.Migrations
 
             modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction", b =>
                 {
-                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", null)
-                        .WithMany("StockTransactions")
-                        .HasForeignKey("DoctorID");
-
                     b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", "Doctor")
-                        .WithMany()
+                        .WithMany("StockTransactions")
                         .HasForeignKey("Doctor_ID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

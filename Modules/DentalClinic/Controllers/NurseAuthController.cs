@@ -82,7 +82,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 {
                     Name = request.Name,
                     Phone = request.Phone,
-                    Email = request.Email,
+                    Email = request.Email.Trim().ToLower(),
                     PasswordHash = _passwordHashService.HashPassword(request.Password)
                 };
 
@@ -132,7 +132,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             try
             {
-                var nurse = await _context.Nurses.FirstOrDefaultAsync(n => n.Email == request.Email);
+                var normalizedEmail = request.Email.Trim().ToLower();
+                var nurse = await _context.Nurses.FirstOrDefaultAsync(n => n.Email == normalizedEmail);
                 if (nurse == null || !_passwordHashService.VerifyPassword(request.Password, nurse.PasswordHash))
                 {
                     return Unauthorized(new { error = "Invalid email or password." });

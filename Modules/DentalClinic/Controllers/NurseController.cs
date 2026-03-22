@@ -99,7 +99,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 {
                     Name = request.Name,
                     Phone = request.Phone,
-                    Email = request.Email,
+                    Email = request.Email.Trim().ToLower(),
                     PasswordHash = _passwordHashService.HashPassword(request.Password)
                 };
 
@@ -146,7 +146,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
                 if (!result.IsSuccess)
                 {
-                    if (result.ErrorMessage == "Nurse not found.")
+                    if (result.ErrorMessage == "Nurse not found")
                         return NotFound(new { error = result.ErrorMessage, nurse_ID = NURSE_ID });
 
                     return BadRequest(new { error = result.ErrorMessage });

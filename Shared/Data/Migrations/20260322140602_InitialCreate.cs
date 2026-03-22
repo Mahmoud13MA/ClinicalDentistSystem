@@ -140,17 +140,11 @@ namespace clinical.APIs.Shared.Data.Migrations
                     Time = table.Column<TimeSpan>(type: "time", nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     Doctor_ID = table.Column<int>(type: "int", nullable: false),
-                    Supply_ID = table.Column<int>(type: "int", nullable: false),
-                    DoctorID = table.Column<int>(type: "int", nullable: true)
+                    Supply_ID = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_StockTransactions", x => x.T_ID);
-                    table.ForeignKey(
-                        name: "FK_StockTransactions_Doctors_DoctorID",
-                        column: x => x.DoctorID,
-                        principalTable: "Doctors",
-                        principalColumn: "ID");
                     table.ForeignKey(
                         name: "FK_StockTransactions_Doctors_Doctor_ID",
                         column: x => x.Doctor_ID,
@@ -216,22 +210,20 @@ namespace clinical.APIs.Shared.Data.Migrations
                     ChangedByDoctorId = table.Column<int>(type: "int", nullable: false),
                     ChangedByDoctorName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     AppointmentId = table.Column<int>(type: "int", nullable: false),
-                    EHR_ID = table.Column<int>(type: "int", nullable: false),
-                    DoctorId = table.Column<int>(type: "int", nullable: false),
-                    Appointment_ID = table.Column<int>(type: "int", nullable: false)
+                    EHR_ID = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_EHRChangeLogs", x => x.ChangeLog_ID);
                     table.ForeignKey(
-                        name: "FK_EHRChangeLogs_Appointments_Appointment_ID",
-                        column: x => x.Appointment_ID,
+                        name: "FK_EHRChangeLogs_Appointments_AppointmentId",
+                        column: x => x.AppointmentId,
                         principalTable: "Appointments",
                         principalColumn: "Appointment_ID",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_EHRChangeLogs_Doctors_DoctorId",
-                        column: x => x.DoctorId,
+                        name: "FK_EHRChangeLogs_Doctors_ChangedByDoctorId",
+                        column: x => x.ChangedByDoctorId,
                         principalTable: "Doctors",
                         principalColumn: "ID",
                         onDelete: ReferentialAction.Restrict);
@@ -362,14 +354,14 @@ namespace clinical.APIs.Shared.Data.Migrations
                 column: "Patient_ID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EHRChangeLogs_Appointment_ID",
+                name: "IX_EHRChangeLogs_AppointmentId",
                 table: "EHRChangeLogs",
-                column: "Appointment_ID");
+                column: "AppointmentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EHRChangeLogs_DoctorId",
+                name: "IX_EHRChangeLogs_ChangedByDoctorId",
                 table: "EHRChangeLogs",
-                column: "DoctorId");
+                column: "ChangedByDoctorId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EHRChangeLogs_EHR_ID",
@@ -401,11 +393,6 @@ namespace clinical.APIs.Shared.Data.Migrations
                 name: "IX_StockTransactions_Doctor_ID",
                 table: "StockTransactions",
                 column: "Doctor_ID");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_StockTransactions_DoctorID",
-                table: "StockTransactions",
-                column: "DoctorID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_StockTransactions_Supply_ID",

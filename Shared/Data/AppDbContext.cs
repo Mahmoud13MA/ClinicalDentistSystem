@@ -63,7 +63,7 @@ namespace clinical.APIs.Shared.Data
           
             modelBuilder.Entity<Stock_Transaction>()
                 .HasOne(st => st.Doctor)
-                .WithMany()
+                .WithMany(d => d.StockTransactions)
                 .HasForeignKey(st => st.Doctor_ID)
                 .OnDelete(DeleteBehavior.Restrict);
 
@@ -77,13 +77,13 @@ namespace clinical.APIs.Shared.Data
             modelBuilder.Entity<EHRChangeLog>()
                 .HasOne(cl => cl.Doctor)
                 .WithMany()
-                .HasForeignKey(cl => cl.DoctorId)
+                .HasForeignKey(cl => cl.ChangedByDoctorId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<EHRChangeLog>()
                 .HasOne(cl => cl.Appointment)
                 .WithMany()
-                .HasForeignKey(cl => cl.Appointment_ID)
+                .HasForeignKey(cl => cl.AppointmentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // MedicationRecord relationships

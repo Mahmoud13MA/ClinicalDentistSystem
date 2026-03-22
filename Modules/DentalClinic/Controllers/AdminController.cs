@@ -27,6 +27,10 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(ModelState);
 
             var validRegistrationKey = configuration["RegistrationSettings:AdminRegistrationKey"];
+            if (string.IsNullOrEmpty(validRegistrationKey))
+            {
+                return StatusCode(500, new { error = "Server configuration error. Contact system administrator." });
+            }
 
             if (request.AdminRegistrationKey != validRegistrationKey)
             {
@@ -42,7 +46,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             var admin = new Admin
             { 
                 Name = request.Name,
-                Email = request.Email,
+                Email = request.Email.Trim().ToLower(),
                 PasswordHash = passwordHashService.HashPassword(request.Password),
 
             };
@@ -88,7 +92,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             if (!ModelState.IsValid) return BadRequest(ModelState);
             var doctor = await context.Doctors.FindAsync(id);
-            if (doctor == null) return BadRequest(new { error = "Doctor Not Found" });
+            if (doctor == null) return NotFound(new { error = "Doctor Not Found" });
 
             if (!string.IsNullOrEmpty(request.Email))
             {
@@ -112,13 +116,13 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
 
         [Authorize(Policy = "Admin")]
-        [HttpPut("nurses/{id:int}/credntials")]
+        [HttpPut("nurses/{id:int}/credentials")]
         public async Task<IActionResult> NurseUpdateCredentialsRequest([FromBody]UpdateCredentialsRequest request,int id)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var nurse = await context.Nurses.FindAsync(id);
-            if (nurse == null) return BadRequest(new { error = "Nurse Not Found " });
+            if (nurse == null) return NotFound(new { error = "Nurse Not Found " });
 
             if (!string.IsNullOrEmpty(request.Email)) {
                 var emailUsed = await emailValidationService.IsEmailUsedAsync(request.Email, nurseId: id);
@@ -142,7 +146,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
 
         [Authorize(Policy = "Admin")]
-        [HttpDelete("doctors /{id:int}/credentials")]
+        [HttpDelete("doctors/{id:int}/credentials")]
 
         public async Task<IActionResult> RemoveDoctorCrednetials(int id)
         {
@@ -155,14 +159,14 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             doctor.PasswordHash=string.Empty;
             await context.SaveChangesAsync();
 
-            return Ok(new {massage = "Doctor Cerdnetails removed . Doctor record kept"});
+            return Ok(new { message = "Doctor credentials removed. Doctor record kept." });
 
 
         }
 
 
         [Authorize(Policy = "Admin")]
-        [HttpDelete("nurses /{id:int}/credentials")]
+        [HttpDelete("nurses/{id:int}/credentials")]
 
         public async Task<IActionResult> RemoveNurseCrednetials(int id)
         {
@@ -175,7 +179,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             nurse.PasswordHash = string.Empty;
             await context.SaveChangesAsync();
 
-            return Ok(new { massage = "nurse Cerdnetails removed . nurse record kept" });
+            return Ok(new { message = "Nurse credentials removed. Nurse record kept." });
         }
 
 
@@ -187,7 +191,11 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var result = await profileManagement.UpdateDoctorInfoAsync(id, request);
-            if (!result.IsSuccess) return BadRequest(new { error = result.ErrorMessage });
+            if (!result.IsSuccess)
+            {
+                if (result.ErrorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase)) return NotFound(new { error = result.ErrorMessage });
+                return BadRequest(new { error = result.ErrorMessage });
+            }
 
             return Ok(new { message = "Doctor profile updated successfully." });
         }
@@ -199,7 +207,11 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var result = await profileManagement.UpdateNurseInfoAsync(id, request);
-            if (!result.IsSuccess) return BadRequest(new { error = result.ErrorMessage });
+            if (!result.IsSuccess)
+            {
+                if (result.ErrorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase)) return NotFound(new { error = result.ErrorMessage });
+                return BadRequest(new { error = result.ErrorMessage });
+            }
 
             return Ok(new { message = "Nurse profile updated successfully." });
         }
@@ -211,7 +223,11 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var result = await profileManagement.UpdatePatientInfoAsync(id, request);
-            if (!result.IsSuccess) return BadRequest(new { error = result.ErrorMessage });
+            if (!result.IsSuccess)
+            {
+                if (result.ErrorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase)) return NotFound(new { error = result.ErrorMessage });
+                return BadRequest(new { error = result.ErrorMessage });
+            }
 
             return Ok(new { message = "Patient profile updated successfully." });
         }
@@ -224,7 +240,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             if (!result.IsSuccess)
             {
-                if (result.ErrorMessage == "Patient not found.")
+                if (result.ErrorMessage == "Patient not found")
                     return NotFound(new { error = result.ErrorMessage });
 
                 return Conflict(new { error = result.ErrorMessage });

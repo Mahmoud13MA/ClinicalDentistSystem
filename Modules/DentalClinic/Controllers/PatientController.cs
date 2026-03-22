@@ -126,13 +126,12 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
                 if (!result.IsSuccess)
                 {
-                    if (result.ErrorMessage == "Patient not found.")
+                    if (result.ErrorMessage == "Patient not found")
                         return NotFound(new { error = result.ErrorMessage, patient_ID = Patient_ID });
 
                     return BadRequest(new { error = result.ErrorMessage });
                 }
 
-                // Fetch updated patient to return
                 var updatedPatient = await _context.Patients.FindAsync(Patient_ID);
                 var response = _mappingService.MapToResponse(updatedPatient);
 
