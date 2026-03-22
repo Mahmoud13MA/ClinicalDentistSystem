@@ -11,12 +11,12 @@ namespace clinical.APIs.Modules.DentalClinic.Services
         
 
       public async Task<(bool IsSuccess, string ErrorMessage)> UpdateDoctorInfoAsync(int id, UpdateStaffInfoRequest request)
-        {
-            var doctor = await context.Doctors.Include(d => d.Appointments ).FirstOrDefaultAsync(d=>d.ID == id);
+      {
+          var doctor = await context.Doctors.FirstOrDefaultAsync(d=>d.ID == id);
 
-            if (doctor == null)  return (false, "Doctor not found");
+          if (doctor == null)  return (false, "Doctor not found");
 
-            bool hasRecords = doctor.Appointments?.Any()== true;
+          bool hasRecords = await context.Appointments.AnyAsync(a => a.Doctor_ID == id);
 
             if(hasRecords && !string.IsNullOrEmpty(request.Name))
                  return (false, "Doctor has active records. Cannot modify Name. Only Phone number updates allowed.");
@@ -38,11 +38,11 @@ namespace clinical.APIs.Modules.DentalClinic.Services
        public async Task<(bool IsSuccess, string ErrorMessage)> UpdateNurseInfoAsync(int id, UpdateStaffInfoRequest request)
         {
 
-            var nurse = await context.Nurses.Include(n => n.Appointments).FirstOrDefaultAsync(n => n.NURSE_ID == id);
+            var nurse = await context.Nurses.FirstOrDefaultAsync(n => n.NURSE_ID == id);
 
             if (nurse == null) return (false, "Nurse not found");
 
-            bool hasRecords = nurse.Appointments?.Any() == true;
+            bool hasRecords = await context.Appointments.AnyAsync(a => a.Nurse_ID == id);
 
             if (hasRecords && !string.IsNullOrEmpty(request.Name)) return (false, "Nurse has active records. Cannot modify Name. Only Phone number updates allowed.");
 
@@ -60,11 +60,11 @@ namespace clinical.APIs.Modules.DentalClinic.Services
 
        public async Task<(bool IsSuccess, string ErrorMessage)> UpdatePatientInfoAsync(int id, UpdatePatientInfoRequest request)
         {
-            var patient = await context.Patients.Include(p => p.Appointments).Include(p=> p.EHRs).FirstOrDefaultAsync(p=>p.Patient_ID == id);
+            var patient = await context.Patients.FirstOrDefaultAsync(p=>p.Patient_ID == id);
 
-            if(patient == null) return (false, "Patient not found. ");
+            if(patient == null) return (false, "Patient not found");
 
-            bool hasRecords = (patient.Appointments?.Any() == true) || (patient.EHRs?.Any() == true);
+            bool hasRecords = await context.Appointments.AnyAsync(a => a.Patient_ID == id) || await context.EHRs.AnyAsync(e => e.Patient_ID == id);
 
         
 
@@ -103,11 +103,12 @@ namespace clinical.APIs.Modules.DentalClinic.Services
 
        public async Task<(bool IsSuccess, string ErrorMessage)> DeletePatientAsync(int id)
         {
-            var patient = await context.Patients.Include(p => p.Appointments).Include(p => p.EHRs).FirstOrDefaultAsync(p => p.Patient_ID == id);
+            var patient = await context.Patients.FirstOrDefaultAsync(p => p.Patient_ID == id);
 
-            if (patient == null) return (false, "Patient not found. ");
+            if (patient == null) return (false, "Patient not found");
 
-            if ((patient.Appointments?.Any() == true) || (patient.EHRs?.Any() == true)) return (false, "Cannot delete patient because they have active medical records or appointments.");
+            bool hasRecords = await context.Appointments.AnyAsync(a => a.Patient_ID == id) || await context.EHRs.AnyAsync(e => e.Patient_ID == id);
+            if (hasRecords) return (false, "Cannot delete patient because they have active medical records or appointments.");
 
             context.Patients.Remove(patient);
             await context.SaveChangesAsync();

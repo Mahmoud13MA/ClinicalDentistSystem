@@ -46,9 +46,7 @@ namespace clinical.APIs.Modules.DentalClinic.Services
                         ChangedAt = now,
                         ChangedByDoctorId = doctorId,
                         ChangedByDoctorName = doctorName,
-                        AppointmentId = appointmentId,
-                        DoctorId = doctorId,
-                        Appointment_ID = appointmentId
+                        AppointmentId = appointmentId
                     });
                 }
             }
@@ -99,9 +97,7 @@ namespace clinical.APIs.Modules.DentalClinic.Services
                     ChangedAt = changedAt,
                     ChangedByDoctorId = doctorId,
                     ChangedByDoctorName = doctorName,
-                    AppointmentId = appointmentId,
-                    DoctorId = doctorId,
-                    Appointment_ID = appointmentId
+                    AppointmentId = appointmentId
                 });
             }
         }

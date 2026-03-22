@@ -18,23 +18,19 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public DateTime ChangedAt { get; set; }
 
         // Who changed it
+        [ForeignKey(nameof(Doctor))]
         public int ChangedByDoctorId { get; set; }
+        public Doctor? Doctor { get; set; }
         public string ChangedByDoctorName { get; set; }
 
         // In which appointment
+        [ForeignKey(nameof(Appointment))]
         public int AppointmentId { get; set; }
-        
+        public Appointment? Appointment { get; set; }
+
         // Foreign Keys
         [ForeignKey(nameof(EHR))]
         public int EHR_ID { get; set; }
         public EHR? EHR { get; set; }
-
-        [ForeignKey(nameof(Doctor))]
-        public int DoctorId { get; set; }
-        public Doctor? Doctor { get; set; }
-
-        [ForeignKey(nameof(Appointment))]
-        public int Appointment_ID { get; set; }
-        public Appointment? Appointment { get; set; }
     }
 }
