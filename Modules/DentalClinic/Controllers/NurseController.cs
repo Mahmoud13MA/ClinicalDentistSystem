@@ -19,13 +19,15 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         private readonly INurseMappingService _mappingService;
         private readonly IPasswordHashService _passwordHashService;
         private readonly IEmailValidationService _emailValidationService;
+        private readonly IProfileManagementService _profileManagement;
 
-        public NurseController(AppDbContext context, INurseMappingService mappingService, IPasswordHashService passwordHashService, IEmailValidationService emailValidationService)
+        public NurseController(AppDbContext context, INurseMappingService mappingService, IPasswordHashService passwordHashService, IEmailValidationService emailValidationService, IProfileManagementService profileManagement)
         {
             _context = context;
             _mappingService = mappingService;
             _passwordHashService = passwordHashService;
             _emailValidationService = emailValidationService;
+            _profileManagement = profileManagement;
         }
 
         // GET: /Nurse
@@ -117,16 +119,11 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         // PUT: /Nurse/{id}
         [Authorize(Policy = "DoctorOnly")]
         [HttpPut("{NURSE_ID}")]
-        public async Task<IActionResult> UpdateNurse(int NURSE_ID, [FromBody] NurseUpdateRequest request)
+        public async Task<IActionResult> UpdateNurse(int NURSE_ID, [FromBody] UpdateStaffInfoRequest request)
         {
             if (request == null)
             {
                 return BadRequest(new { error = "Nurse data is required." });
-            }
-
-            if (NURSE_ID != request.NURSE_ID)
-            {
-                return BadRequest(new { error = "Nurse ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
 
             if (!ModelState.IsValid)
@@ -145,42 +142,21 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             try
             {
-                // Check if nurse exists
-                var existingNurse = await _context.Nurses.FindAsync(NURSE_ID);
-                if (existingNurse == null)
+                var result = await _profileManagement.UpdateNurseInfoAsync(NURSE_ID, request);
+
+                if (!result.IsSuccess)
                 {
-                    return NotFound(new { error = "Nurse not found.", nurse_ID = NURSE_ID });
+                    if (result.ErrorMessage == "Nurse not found.")
+                        return NotFound(new { error = result.ErrorMessage, nurse_ID = NURSE_ID });
+
+                    return BadRequest(new { error = result.ErrorMessage });
                 }
 
-                // Check if email is being changed and if new email already exists
-                if (existingNurse.Email != request.Email)
-                {
-                    var emailExists = await _emailValidationService.IsEmailUsedAsync(request.Email, nurseId: NURSE_ID);
-                    if (emailExists)
-                    {
-                        return BadRequest(new { error = "Email already in use by another nurse." });
-                    }
-                }
+                // Fetch updated nurse to return
+                var updatedNurse = await _context.Nurses.FindAsync(NURSE_ID);
+                var response = _mappingService.MapToResponse(updatedNurse);
 
-                // Update nurse properties
-                existingNurse.Name = request.Name;
-                existingNurse.Phone = request.Phone;
-                existingNurse.Email = request.Email;
-
-                _context.Nurses.Update(existingNurse);
-                await _context.SaveChangesAsync();
-
-                var response = _mappingService.MapToResponse(existingNurse);
                 return Ok(new { message = "Nurse updated successfully.", nurse = response });
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                // Check if nurse still exists
-                if (!await _context.Nurses.AnyAsync(n => n.NURSE_ID == NURSE_ID))
-                {
-                    return NotFound(new { error = "Nurse not found during update.", nurse_ID = NURSE_ID });
-                }
-                throw;
             }
             catch (Exception ex)
             {

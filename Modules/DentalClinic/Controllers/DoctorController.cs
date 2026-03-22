@@ -19,13 +19,15 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         private readonly IDoctorMappingService _mappingService;
         private readonly IPasswordHashService _passwordHashService;
         private readonly IEmailValidationService _emailValidationService;
+        private readonly IProfileManagementService _profileManagement;
 
-        public DoctorController(AppDbContext context, IDoctorMappingService mappingService, IPasswordHashService passwordHashService, IEmailValidationService emailValidationService)
+        public DoctorController(AppDbContext context, IDoctorMappingService mappingService, IPasswordHashService passwordHashService, IEmailValidationService emailValidationService, IProfileManagementService profileManagement)
         {
             _context = context;
             _mappingService = mappingService;
             _passwordHashService = passwordHashService;
             _emailValidationService = emailValidationService;
+            _profileManagement = profileManagement;
         }
 
         [HttpGet]
@@ -108,16 +110,11 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         }
 
         [HttpPut("{ID}")]
-        public async Task<IActionResult> UpdateDoctor(int ID, [FromBody] DoctorUpdateRequest request)
+        public async Task<IActionResult> UpdateDoctor(int ID, [FromBody] UpdateStaffInfoRequest request)
         {
             if (request == null)
             {
                 return BadRequest(new { error = "Doctor data is required." });
-            }
-
-            if (ID != request.ID)
-            {
-                return BadRequest(new { error = "Doctor ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
 
             if (!ModelState.IsValid)
@@ -136,42 +133,21 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             try
             {
-                // Check if doctor exists
-                var existingDoctor = await _context.Doctors.FindAsync(ID);
-                if (existingDoctor == null)
+                var result = await _profileManagement.UpdateDoctorInfoAsync(ID, request);
+
+                if (!result.IsSuccess)
                 {
-                    return NotFound(new { error = "Doctor not found.", doctor_ID = ID });
+                    if (result.ErrorMessage == "Doctor not found.")
+                        return NotFound(new { error = result.ErrorMessage, doctor_ID = ID });
+
+                    return BadRequest(new { error = result.ErrorMessage });
                 }
 
-                // Check if email is being changed and if new email already exists
-                if (existingDoctor.Email != request.Email)
-                {
-                    var emailExists = await _emailValidationService.IsEmailUsedAsync(request.Email, doctorId: ID);
-                    if (emailExists)
-                    {
-                        return BadRequest(new { error = "Email already in use by another doctor." });
-                    }
-                }
+                // Fetch updated doctor to return
+                var updatedDoctor = await _context.Doctors.FindAsync(ID);
+                var response = _mappingService.MapToResponse(updatedDoctor);
 
-                // Update doctor properties
-                existingDoctor.Name = request.Name;
-                existingDoctor.Phone = request.Phone;
-                existingDoctor.Email = request.Email;
-
-                _context.Doctors.Update(existingDoctor);
-                await _context.SaveChangesAsync();
-
-                var response = _mappingService.MapToResponse(existingDoctor);
                 return Ok(new { message = "Doctor updated successfully.", doctor = response });
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                // Check if doctor still exists
-                if (!await _context.Doctors.AnyAsync(d => d.ID == ID))
-                {
-                    return NotFound(new { error = "Doctor not found during update.", doctor_ID = ID });
-                }
-                throw;
             }
             catch (Exception ex)
             {

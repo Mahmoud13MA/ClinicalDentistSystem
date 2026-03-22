@@ -7,12 +7,13 @@ using Microsoft.EntityFrameworkCore;
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using clinical.APIs.Shared.Services;
+using clinical.APIs.Modules.DentalClinic.Services;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration, IEmailValidationService emailValidationService) : ControllerBase
+    public class AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration, IEmailValidationService emailValidationService ,IProfileManagementService profileManagement) : ControllerBase
     {
 
 
@@ -103,14 +104,12 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                     doctor.PasswordHash=passwordHashService.HashPassword(request.Password);
 
                 }
-
-            
-
             await context.SaveChangesAsync();
 
             return Ok(new { message = "Doctor Credentials Updated " });
 
             }
+
 
         [Authorize(Policy = "Admin")]
         [HttpPut("nurses/{id:int}/credntials")]
@@ -162,9 +161,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         }
 
 
-
-
-
         [Authorize(Policy = "Admin")]
         [HttpDelete("nurses /{id:int}/credentials")]
 
@@ -180,19 +176,66 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             await context.SaveChangesAsync();
 
             return Ok(new { massage = "nurse Cerdnetails removed . nurse record kept" });
-
-
-
         }
 
 
-        
 
+        [Authorize(Policy = "Admin")]
+        [HttpPut("doctors/{id:int}/updateinfo")]
+        public async Task<IActionResult> UpdateDoctorInfo(int id, [FromBody] UpdateStaffInfoRequest request)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
+            var result = await profileManagement.UpdateDoctorInfoAsync(id, request);
+            if (!result.IsSuccess) return BadRequest(new { error = result.ErrorMessage });
 
+            return Ok(new { message = "Doctor profile updated successfully." });
+        }
 
+        [Authorize(Policy = "Admin")]
+        [HttpPut("nurses/{id:int}/updateinfo")]
+        public async Task<IActionResult> UpdateNurseInfo(int id, [FromBody] UpdateStaffInfoRequest request)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
+            var result = await profileManagement.UpdateNurseInfoAsync(id, request);
+            if (!result.IsSuccess) return BadRequest(new { error = result.ErrorMessage });
+
+            return Ok(new { message = "Nurse profile updated successfully." });
+        }
+
+        [Authorize(Policy = "Admin")]
+        [HttpPut("patients/{id:int}/updateinfo")]
+        public async Task<IActionResult> UpdatePatientInfo(int id, [FromBody] UpdatePatientInfoRequest request)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var result = await profileManagement.UpdatePatientInfoAsync(id, request);
+            if (!result.IsSuccess) return BadRequest(new { error = result.ErrorMessage });
+
+            return Ok(new { message = "Patient profile updated successfully." });
+        }
+
+        [Authorize(Policy = "Admin")]
+        [HttpDelete("patients/{id:int}")]
+        public async Task<IActionResult> DeletePatient(int id)
+        {
+            var result = await profileManagement.DeletePatientAsync(id);
+
+            if (!result.IsSuccess)
+            {
+                if (result.ErrorMessage == "Patient not found.")
+                    return NotFound(new { error = result.ErrorMessage });
+
+                return Conflict(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { message = "Patient deleted successfully." });
+        }
     }
+
+
+
 
 
 

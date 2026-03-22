@@ -14,6 +14,7 @@ namespace clinical.APIs.Modules.DentalClinic
             services.AddScoped<INurseMappingService,NurseMappingService>();
             services.AddScoped<IDoctorMappingService, DoctorMappingService>();
             services.AddScoped<IStockTransactionMappingService, StockTransactionMappingService>();
+            services.AddScoped<IProfileManagementService, ProfileManagementService>();
 
             // AI
             services.AddHttpClient<ILlamaService, LlamaService>();

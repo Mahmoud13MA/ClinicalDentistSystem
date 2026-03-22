@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using clinical.APIs.Modules.DentalClinic.Controllers;
 using clinical.APIs.Modules.DentalClinic.Models;
@@ -22,6 +19,7 @@ namespace clinical.APIs.Modules.DentalClinic.Tests
         private readonly Mock<INurseMappingService> _mappingMock;
         private readonly Mock<IPasswordHashService> _passwordMock;
         private readonly Mock<IEmailValidationService> _emailValidationMock;
+        private readonly Mock<IProfileManagementService> _profileMock;
 
         public NurseControllerTests()
         {
@@ -33,6 +31,7 @@ namespace clinical.APIs.Modules.DentalClinic.Tests
             _mappingMock = new Mock<INurseMappingService>();
             _passwordMock = new Mock<IPasswordHashService>();
             _emailValidationMock = new Mock<IEmailValidationService>();
+            _profileMock = new Mock<IProfileManagementService>();
             // Setup default behaviour for mock to assume email is not used (true for unique check usually, but IsEmailUsedAsync returns true if used)
             _emailValidationMock.Setup(m => m.IsEmailUsedAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int?>()))
                 .ReturnsAsync(false);
@@ -41,7 +40,7 @@ namespace clinical.APIs.Modules.DentalClinic.Tests
         private AppDbContext CreateContext() => new AppDbContext(_options);
 
         private NurseController CreateController(AppDbContext ctx) =>
-            new NurseController(ctx, _mappingMock.Object, _passwordMock.Object, _emailValidationMock.Object);
+            new NurseController(ctx, _mappingMock.Object, _passwordMock.Object, _emailValidationMock.Object, _profileMock.Object);
 
         [Fact]
         public async Task GetNurses_ReturnsNotFound_WhenNoNurses()
