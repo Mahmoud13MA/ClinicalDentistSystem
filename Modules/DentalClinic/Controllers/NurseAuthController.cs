@@ -2,6 +2,7 @@ using clinical.APIs.Modules.DentalClinic.Models;
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Security;
+using clinical.APIs.Shared.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,17 +16,20 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         private readonly IJwtService _jwtService;
         private readonly IPasswordHashService _passwordHashService;
         private readonly IConfiguration _configuration;
+        private readonly IEmailValidationService _emailValidationService;
 
         public NurseAuthController(
             AppDbContext context, 
             IJwtService jwtService, 
             IPasswordHashService passwordHashService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IEmailValidationService emailValidationService)
         {
             _context = context;
             _jwtService = jwtService;
             _passwordHashService = passwordHashService;
             _configuration = configuration;
+            _emailValidationService = emailValidationService;
         }
 
         // POST: api/NurseAuth/Register
@@ -67,8 +71,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 }
 
                 // Check if email already exists
-                var existingNurse = await _context.Nurses.FirstOrDefaultAsync(n => n.Email == request.Email);
-                if (existingNurse != null)
+                var isEmailUsed = await _emailValidationService.IsEmailUsedAsync(request.Email);
+                if (isEmailUsed)
                 {
                     return BadRequest(new { error = "Email already registered." });
                 }

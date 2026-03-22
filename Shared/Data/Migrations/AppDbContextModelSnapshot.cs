@@ -8,7 +8,7 @@ using clinical.APIs.Shared.Data;
 
 #nullable disable
 
-namespace clinical.APIs.Migrations
+namespace clinical.APIs.Shared.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
@@ -22,7 +22,32 @@ namespace clinical.APIs.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("clinical.APIs.Models.Appointment", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Admin", b =>
+                {
+                    b.Property<int>("Admin_ID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Admin_ID"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Admin_ID");
+
+                    b.ToTable("Admins");
+                });
+
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Appointment", b =>
                 {
                     b.Property<int>("Appointment_ID")
                         .ValueGeneratedOnAdd()
@@ -64,7 +89,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("Appointments");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Doctor", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Doctor", b =>
                 {
                     b.Property<int>("ID")
                         .ValueGeneratedOnAdd()
@@ -93,7 +118,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("Doctors");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.EHR", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.EHR", b =>
                 {
                     b.Property<int>("EHR_ID")
                         .ValueGeneratedOnAdd()
@@ -150,7 +175,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("EHRs");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.EHRChangeLog", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.EHRChangeLog", b =>
                 {
                     b.Property<int>("ChangeLog_ID")
                         .ValueGeneratedOnAdd()
@@ -205,7 +230,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("EHRChangeLogs");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.MedicationRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.MedicationRecord", b =>
                 {
                     b.Property<int>("Medication_ID")
                         .ValueGeneratedOnAdd()
@@ -245,7 +270,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("MedicationRecords");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Nurse", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Nurse", b =>
                 {
                     b.Property<int>("NURSE_ID")
                         .ValueGeneratedOnAdd()
@@ -274,7 +299,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("Nurses");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Patient", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Patient", b =>
                 {
                     b.Property<int>("Patient_ID")
                         .ValueGeneratedOnAdd()
@@ -314,7 +339,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("Patients");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.ProcedureRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.ProcedureRecord", b =>
                 {
                     b.Property<int>("Procedure_ID")
                         .ValueGeneratedOnAdd()
@@ -352,7 +377,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("ProcedureRecords");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Stock_Transaction", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction", b =>
                 {
                     b.Property<int>("T_ID")
                         .ValueGeneratedOnAdd()
@@ -389,7 +414,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("StockTransactions");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Supply", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Supply", b =>
                 {
                     b.Property<int>("Supply_ID")
                         .ValueGeneratedOnAdd()
@@ -420,7 +445,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("Supplies");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.ToothRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.ToothRecord", b =>
                 {
                     b.Property<int>("ToothRecord_ID")
                         .ValueGeneratedOnAdd()
@@ -459,7 +484,7 @@ namespace clinical.APIs.Migrations
                     b.ToTable("ToothRecords");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.XRayRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.XRayRecord", b =>
                 {
                     b.Property<int>("XRay_ID")
                         .ValueGeneratedOnAdd()
@@ -499,21 +524,21 @@ namespace clinical.APIs.Migrations
                     b.ToTable("XRayRecords");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Appointment", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Appointment", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.Doctor", "Doctor")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", "Doctor")
                         .WithMany("Appointments")
                         .HasForeignKey("Doctor_ID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("clinical.APIs.Models.Nurse", "Nurse")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Nurse", "Nurse")
                         .WithMany("Appointments")
                         .HasForeignKey("Nurse_ID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("clinical.APIs.Models.Patient", "Patient")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Patient", "Patient")
                         .WithMany("Appointments")
                         .HasForeignKey("Patient_ID")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -526,15 +551,15 @@ namespace clinical.APIs.Migrations
                     b.Navigation("Patient");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.EHR", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.EHR", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.Appointment", "Appointment")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Appointment", "Appointment")
                         .WithOne("EHR")
-                        .HasForeignKey("clinical.APIs.Models.EHR", "AppointmentId")
+                        .HasForeignKey("clinical.APIs.Modules.DentalClinic.Models.EHR", "AppointmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("clinical.APIs.Models.Patient", "Patient")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Patient", "Patient")
                         .WithMany("EHRs")
                         .HasForeignKey("Patient_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -545,21 +570,21 @@ namespace clinical.APIs.Migrations
                     b.Navigation("Patient");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.EHRChangeLog", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.EHRChangeLog", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.Appointment", "Appointment")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Appointment", "Appointment")
                         .WithMany()
                         .HasForeignKey("Appointment_ID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("clinical.APIs.Models.Doctor", "Doctor")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", "Doctor")
                         .WithMany()
                         .HasForeignKey("DoctorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("clinical.APIs.Models.EHR", "EHR")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.EHR", "EHR")
                         .WithMany("ChangeLogs")
                         .HasForeignKey("EHR_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -572,9 +597,9 @@ namespace clinical.APIs.Migrations
                     b.Navigation("EHR");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.MedicationRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.MedicationRecord", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.EHR", "EHR")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.EHR", "EHR")
                         .WithMany("Medications")
                         .HasForeignKey("EHR_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -583,9 +608,9 @@ namespace clinical.APIs.Migrations
                     b.Navigation("EHR");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.ProcedureRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.ProcedureRecord", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.EHR", "EHR")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.EHR", "EHR")
                         .WithMany("Procedures")
                         .HasForeignKey("EHR_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -594,19 +619,19 @@ namespace clinical.APIs.Migrations
                     b.Navigation("EHR");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Stock_Transaction", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.Doctor", null)
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", null)
                         .WithMany("StockTransactions")
                         .HasForeignKey("DoctorID");
 
-                    b.HasOne("clinical.APIs.Models.Doctor", "Doctor")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", "Doctor")
                         .WithMany()
                         .HasForeignKey("Doctor_ID")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("clinical.APIs.Models.Supply", "Supply")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Supply", "Supply")
                         .WithMany("StockTransactions")
                         .HasForeignKey("Supply_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -617,9 +642,9 @@ namespace clinical.APIs.Migrations
                     b.Navigation("Supply");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.ToothRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.ToothRecord", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.EHR", "EHR")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.EHR", "EHR")
                         .WithMany("Teeth")
                         .HasForeignKey("EHR_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -628,9 +653,9 @@ namespace clinical.APIs.Migrations
                     b.Navigation("EHR");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.XRayRecord", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.XRayRecord", b =>
                 {
-                    b.HasOne("clinical.APIs.Models.EHR", "EHR")
+                    b.HasOne("clinical.APIs.Modules.DentalClinic.Models.EHR", "EHR")
                         .WithMany("XRays")
                         .HasForeignKey("EHR_ID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -639,20 +664,20 @@ namespace clinical.APIs.Migrations
                     b.Navigation("EHR");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Appointment", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Appointment", b =>
                 {
                     b.Navigation("EHR")
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Doctor", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Doctor", b =>
                 {
                     b.Navigation("Appointments");
 
                     b.Navigation("StockTransactions");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.EHR", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.EHR", b =>
                 {
                     b.Navigation("ChangeLogs");
 
@@ -665,19 +690,19 @@ namespace clinical.APIs.Migrations
                     b.Navigation("XRays");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Nurse", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Nurse", b =>
                 {
                     b.Navigation("Appointments");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Patient", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Patient", b =>
                 {
                     b.Navigation("Appointments");
 
                     b.Navigation("EHRs");
                 });
 
-            modelBuilder.Entity("clinical.APIs.Models.Supply", b =>
+            modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Supply", b =>
                 {
                     b.Navigation("StockTransactions");
                 });

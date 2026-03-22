@@ -72,7 +72,7 @@ builder.Services.AddCors(options =>
 // Core services
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
-builder.Services.AddScoped<IEHRChangeLogService, EHRChangeLogService>();
+builder.Services.AddScoped<clinical.APIs.Shared.Services.IEmailValidationService, clinical.APIs.Shared.Services.EmailValidationService>();
 
 // Module services
 builder.Services.AddDentalClinicModule();
@@ -108,6 +108,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("DoctorOnly", policy => policy.RequireRole("Doctor"));
     options.AddPolicy("NurseOnly", policy => policy.RequireRole("Nurse"));
     options.AddPolicy("DoctorOrNurse", policy => policy.RequireRole("Doctor", "Nurse"));
+    options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
 });
 
 builder.Services.AddControllers();
