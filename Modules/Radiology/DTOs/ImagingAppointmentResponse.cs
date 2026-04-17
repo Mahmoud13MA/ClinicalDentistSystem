@@ -10,7 +10,7 @@ namespace clinical.APIs.Modules.Radiology.DTOs
         public int RadiologistID { get; set; }
         public RadiologistBasicInfo Radiologist { get; set; }
         public int EquipmentID { get; set; }
-        public EquipmentBasicInfo Equipment { get; set; }
+        public EquipmentResponseBasicInfo Equipment { get; set; }
     }
 
     public class PatientBasicInfoRadiology
@@ -34,11 +34,10 @@ namespace clinical.APIs.Modules.Radiology.DTOs
         public string Specialty { get; set; }
     }
 
-    public class EquipmentBasicInfo
+    public class EquipmentResponseBasicInfo
     {
         public int EquipmentID { get; set; }
         public string Type { get; set; }
         public string Model { get; set; }
-        public string ManufacturerName { get; set; }
     }
 }
