@@ -99,7 +99,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 {
                     Name = request.Name,
                     Phone = request.Phone,
-                    Email = request.Email.Trim().ToLower(),
+                    Email = request.Email.Trim().ToLowerInvariant(),
                     PasswordHash = _passwordHashService.HashPassword(request.Password)
                 };
 

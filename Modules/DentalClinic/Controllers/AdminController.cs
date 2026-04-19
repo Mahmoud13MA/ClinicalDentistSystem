@@ -1,5 +1,4 @@
-﻿
-using clinical.APIs.Modules.DentalClinic.Models;
+﻿using clinical.APIs.Modules.DentalClinic.Models;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -46,7 +45,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             var admin = new Admin
             { 
                 Name = request.Name,
-                Email = request.Email.Trim().ToLower(),
+                Email = request.Email.Trim().ToLowerInvariant(),
                 PasswordHash = passwordHashService.HashPassword(request.Password),
 
             };
@@ -65,8 +64,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-
-            var admin = await context.Admins.FirstOrDefaultAsync(a => a.Email == request.Email);
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var admin = await context.Admins.FirstOrDefaultAsync(a => a.Email == normalizedEmail);
 
             if (admin == null || !passwordHashService.VerifyPassword(request.Password, admin.PasswordHash))
             {
@@ -77,7 +76,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             var token = jwtService.GenerateToken(admin.Admin_ID, admin.Email, admin.Name, "Admin");
 
             return Ok(new { message = "Login successful", token });
-
 
         }
 
@@ -148,7 +146,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [Authorize(Policy = "Admin")]
         [HttpDelete("doctors/{id:int}/credentials")]
 
-        public async Task<IActionResult> RemoveDoctorCrednetials(int id)
+        public async Task<IActionResult> RemoveDoctorCredentials(int id)
         {
             var doctor = await context.Doctors.FindAsync(id);
 
