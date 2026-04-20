@@ -11,5 +11,6 @@ namespace clinical.APIs.Modules.Radiology.DTOs
         [Required(ErrorMessage = "Model is required")]
         [StringLength(100, ErrorMessage = "Model cannot exceed 100 characters")]
         public string Model { get; set; }
+
     }
 }

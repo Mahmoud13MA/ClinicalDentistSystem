@@ -15,6 +15,9 @@ namespace Radiology.Models
         [StringLength(100)]
         public string Model { get; set; }
 
+        [Required]
+        public DateTime ServiceDate { get; set; }
+
         public ICollection<ImagingAppointment> ImagingAppointments { get; set; } = new List<ImagingAppointment>();
     }
 }
