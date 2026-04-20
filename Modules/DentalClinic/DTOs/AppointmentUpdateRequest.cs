@@ -14,7 +14,7 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
         public TimeSpan Time { get; set; }
         
         [Required(ErrorMessage = "Type is required")]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
         
         [Required(ErrorMessage = "Patient ID is required")]
         public int Patient_ID { get; set; }

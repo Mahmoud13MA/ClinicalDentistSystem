@@ -6,18 +6,18 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
     {
 
         [Required]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [Required]
         [EmailAddress]
-        public string Email { get; set; } 
+        public string Email { get; set; } = string.Empty;
 
         [Required]
         [MinLength(6)]
-        public string Password { get; set; } 
+        public string Password { get; set; } = string.Empty;
 
         [Required]
-        public string AdminRegistrationKey { get; set; }
+        public string AdminRegistrationKey { get; set; } = string.Empty;
 
 
         

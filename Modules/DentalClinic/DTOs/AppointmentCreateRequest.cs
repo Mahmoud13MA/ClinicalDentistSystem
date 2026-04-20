@@ -12,7 +12,7 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
         
         
         [Required]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
         
         [Required]
         public int Patient_ID { get; set; }
