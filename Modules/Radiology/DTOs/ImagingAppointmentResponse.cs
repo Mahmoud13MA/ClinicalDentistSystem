@@ -15,14 +15,7 @@ namespace clinical.APIs.Modules.Radiology.DTOs
 
     public class PatientBasicInfoRadiology
     {
-        public int Patient_ID { get; set; }
-        public string First { get; set; }
-        public string Middle { get; set; }
-        public string Last { get; set; }
-        public string FullName => $"{First} {Middle} {Last}".Replace("  ", " ").Trim();
-        public string Gender { get; set; }
-        public DateTime DOB { get; set; }
-        public string Phone { get; set; }
+        public int PatientID { get; set; }
     }
 
     public class RadiologistBasicInfo
