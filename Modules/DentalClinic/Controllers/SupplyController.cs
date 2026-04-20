@@ -1,22 +1,55 @@
 using clinical.APIs.Modules.DentalClinic.DTOs;
+using clinical.APIs.Modules.DentalClinic.Models;
+using clinical.APIs.Shared.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using clinical.APIs.Shared.Data;
-using clinical.APIs.Modules.DentalClinic.Models;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Authorize(Policy = "DoctorOnly")]
     [ApiController]
     [Route("[controller]")]
-    public class SupplyController : Controller
+    public class SupplyController(AppDbContext context) : ControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public SupplyController(AppDbContext context)
+        private static StockTransactionBasicInfo MapStockTransactionToBasicInfo(Stock_Transaction transaction)
         {
-            _context = context;
+            return new StockTransactionBasicInfo
+            {
+                T_ID = transaction.T_ID,
+                Date = transaction.Date,
+                Time = transaction.Time,
+                Quantity = transaction.Quantity,
+                Doctor_ID = transaction.Doctor_ID,
+                DoctorName = transaction.Doctor?.Name
+            };
+        }
+
+        private static SupplyResponse MapSupplyToResponse(Supply supply)
+        {
+            return new SupplyResponse
+            {
+                Supply_ID = supply.Supply_ID,
+                Supply_Name = supply.Supply_Name,
+                Category = supply.Category,
+                Unit = supply.Unit,
+                Quantity = supply.Quantity,
+                Description = supply.Description,
+                StockTransactions = supply.StockTransactions?.Select(MapStockTransactionToBasicInfo).ToList()
+            };
+        }
+
+        private static SupplyBasicInfo MapSupplyToBasicInfo(Supply supply)
+        {
+            return new SupplyBasicInfo
+            {
+                Supply_ID = supply.Supply_ID,
+                Supply_Name = supply.Supply_Name,
+                Category = supply.Category,
+                Unit = supply.Unit,
+                Quantity = supply.Quantity,
+                Description = supply.Description
+            };
         }
 
         // GET: /Supply
@@ -24,43 +57,24 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [Route("")]
         public async Task<IActionResult> GetSupplies()
         {
-            var supplies = await _context.Supplies
+            var supplies = await context.Supplies
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
                 .ToListAsync();
 
-            if (supplies == null || supplies.Count == 0)
+            if (supplies.Count == 0)
             {
                 return NotFound(new { message = "No supplies found." });
             }
 
-            var response = supplies.Select(s => new SupplyResponse
-            {
-                Supply_ID = s.Supply_ID,
-                Supply_Name = s.Supply_Name,
-                Category = s.Category,
-                Unit = s.Unit,
-                Quantity = s.Quantity,
-                Description = s.Description,
-                StockTransactions = s.StockTransactions?.Select(st => new StockTransactionBasicInfo
-                {
-                    T_ID = st.T_ID,
-                    Date = st.Date,
-                    Time = st.Time,
-                    Quantity = st.Quantity,
-                    Doctor_ID = st.Doctor_ID,
-                    DoctorName = st.Doctor?.Name
-                }).ToList()
-            }).ToList();
-
-            return Ok(response);
+            return Ok(supplies.Select(MapSupplyToResponse).ToList());
         }
 
         // GET: /Supply/{id}
         [HttpGet("{Supply_ID}")]
         public async Task<IActionResult> GetSupplyById(int Supply_ID)
         {
-            var supply = await _context.Supplies
+            var supply = await context.Supplies
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
                 .FirstOrDefaultAsync(s => s.Supply_ID == Supply_ID);
@@ -70,287 +84,151 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
             }
 
-            var response = new SupplyResponse
-            {
-                Supply_ID = supply.Supply_ID,
-                Supply_Name = supply.Supply_Name,
-                Category = supply.Category,
-                Unit = supply.Unit,
-                Quantity = supply.Quantity,
-                Description = supply.Description,
-                StockTransactions = supply.StockTransactions?.Select(st => new StockTransactionBasicInfo
-                {
-                    T_ID = st.T_ID,
-                    Date = st.Date,
-                    Time = st.Time,
-                    Quantity = st.Quantity,
-                    Doctor_ID = st.Doctor_ID,
-                    DoctorName = st.Doctor?.Name
-                }).ToList()
-            };
-
-            return Ok(response);
+            return Ok(MapSupplyToResponse(supply));
         }
 
         // GET: /Supply/Category/{category}
         [HttpGet("Category/{category}")]
         public async Task<IActionResult> GetSuppliesByCategory(string category)
         {
-            var supplies = await _context.Supplies
+            var supplies = await context.Supplies
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
-                .Where(s => s.Category.ToLower() == category.ToLower())
+                .Where(s => string.Equals(s.Category, category, StringComparison.OrdinalIgnoreCase))
                 .ToListAsync();
 
-            if (supplies == null || supplies.Count == 0)
+            if (supplies.Count == 0)
             {
-                return NotFound(new { message = "No supplies found for this category.", category = category });
+                return NotFound(new { message = "No supplies found for this category.", category });
             }
 
-            var response = supplies.Select(s => new SupplyResponse
-            {
-                Supply_ID = s.Supply_ID,
-                Supply_Name = s.Supply_Name,
-                Category = s.Category,
-                Unit = s.Unit,
-                Quantity = s.Quantity,
-                Description = s.Description,
-                StockTransactions = s.StockTransactions?.Select(st => new StockTransactionBasicInfo
-                {
-                    T_ID = st.T_ID,
-                    Date = st.Date,
-                    Time = st.Time,
-                    Quantity = st.Quantity,
-                    Doctor_ID = st.Doctor_ID,
-                    DoctorName = st.Doctor?.Name
-                }).ToList()
-            }).ToList();
-
-            return Ok(response);
+            return Ok(supplies.Select(MapSupplyToResponse).ToList());
         }
 
         // GET: /Supply/LowStock/{threshold}
         [HttpGet("LowStock/{threshold}")]
         public async Task<IActionResult> GetLowStockSupplies(int threshold)
         {
-            var supplies = await _context.Supplies
+            var supplies = await context.Supplies
                 .Where(s => s.Quantity <= threshold)
                 .ToListAsync();
 
-            if (supplies == null || supplies.Count == 0)
+            if (supplies.Count == 0)
             {
-                return NotFound(new { message = "No low stock supplies found.", threshold = threshold });
+                return NotFound(new { message = "No low stock supplies found.", threshold });
             }
 
-            var response = supplies.Select(s => new SupplyBasicInfo
-            {
-                Supply_ID = s.Supply_ID,
-                Supply_Name = s.Supply_Name,
-                Category = s.Category,
-                Unit = s.Unit,
-                Quantity = s.Quantity,
-                Description = s.Description
-            }).ToList();
-
-            return Ok(response);
+            return Ok(supplies.Select(MapSupplyToBasicInfo).ToList());
         }
 
         // POST: /Supply
         [HttpPost]
-        public async Task<IActionResult> CreateSupply([FromBody] Supply supply)
+        public async Task<IActionResult> CreateSupply([FromBody] SupplyCreateRequest request)
         {
-            if (supply == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Supply data is required.", hint = "Make sure you're sending a valid JSON body with supply information." });
             }
 
-            if (!ModelState.IsValid)
+            var supply = new Supply
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
+                Supply_Name = request.Supply_Name,
+                Category = request.Category,
+                Unit = request.Unit,
+                Quantity = request.Quantity,
+                Description = request.Description
+            };
 
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = errors,
-                    hint = "Required fields: Supply_Name, Category, Unit, Quantity"
-                });
-            }
+            context.Supplies.Add(supply);
+            await context.SaveChangesAsync();
 
-            try
-            {
-                _context.Supplies.Add(supply);
-                await _context.SaveChangesAsync();
-
-                var response = new SupplyBasicInfo
-                {
-                    Supply_ID = supply.Supply_ID,
-                    Supply_Name = supply.Supply_Name,
-                    Category = supply.Category,
-                    Unit = supply.Unit,
-                    Quantity = supply.Quantity,
-                    Description = supply.Description
-                };
-
-                return CreatedAtAction(nameof(GetSupplyById), new { Supply_ID = supply.Supply_ID }, response);
-            }
-            catch (Exception ex)
-            {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
-            }
+            return CreatedAtAction(nameof(GetSupplyById), new { Supply_ID = supply.Supply_ID }, MapSupplyToBasicInfo(supply));
         }
 
         // PUT: /Supply/{id}
         [HttpPut("{Supply_ID}")]
-        public async Task<IActionResult> UpdateSupply(int Supply_ID, [FromBody] Supply supply)
+        public async Task<IActionResult> UpdateSupply(int Supply_ID, [FromBody] SupplyUpdateRequest request)
         {
-            if (supply == null)
+            if (request == null)
             {
                 return BadRequest(new { error = "Supply data is required." });
             }
 
-            if (Supply_ID != supply.Supply_ID)
+            if (Supply_ID != request.Supply_ID)
             {
                 return BadRequest(new { error = "Supply ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
             }
 
-            if (!ModelState.IsValid)
+            var existingSupply = await context.Supplies.FindAsync(Supply_ID);
+            if (existingSupply == null)
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = errors
-                });
+                return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
             }
 
-            try
-            {
-                // Check if supply exists
-                var existingSupply = await _context.Supplies.FindAsync(Supply_ID);
-                if (existingSupply == null)
-                {
-                    return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
-                }
+            existingSupply.Supply_Name = request.Supply_Name;
+            existingSupply.Category = request.Category;
+            existingSupply.Unit = request.Unit;
+            existingSupply.Quantity = request.Quantity;
+            existingSupply.Description = request.Description;
 
-                // Update supply properties
-                existingSupply.Supply_Name = supply.Supply_Name;
-                existingSupply.Category = supply.Category;
-                existingSupply.Unit = supply.Unit;
-                existingSupply.Quantity = supply.Quantity;
-                existingSupply.Description = supply.Description;
+            await context.SaveChangesAsync();
 
-                _context.Supplies.Update(existingSupply);
-                await _context.SaveChangesAsync();
-
-                var response = new SupplyBasicInfo
-                {
-                    Supply_ID = existingSupply.Supply_ID,
-                    Supply_Name = existingSupply.Supply_Name,
-                    Category = existingSupply.Category,
-                    Unit = existingSupply.Unit,
-                    Quantity = existingSupply.Quantity,
-                    Description = existingSupply.Description
-                };
-
-                return Ok(new { message = "Supply updated successfully.", supply = response });
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                // Check if supply still exists
-                if (!await _context.Supplies.AnyAsync(s => s.Supply_ID == Supply_ID))
-                {
-                    return NotFound(new { error = "Supply not found during update.", supply_ID = Supply_ID });
-                }
-                throw;
-            }
-            catch (Exception ex)
-            {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
-            }
+            return Ok(new { message = "Supply updated successfully.", supply = MapSupplyToBasicInfo(existingSupply) });
         }
 
         // PATCH: /Supply/{id}/AddStock
         [HttpPatch("{Supply_ID}/AddStock")]
-        public async Task<IActionResult> AddStock(int Supply_ID, [FromBody] int quantity)
+        public async Task<IActionResult> AddStock(int Supply_ID, [FromBody] SupplyAddStockRequest request)
         {
-            if (quantity <= 0)
+            if (request == null)
             {
-                return BadRequest(new { error = "Quantity must be greater than zero.", quantity = quantity });
+                return BadRequest(new { error = "Supply data is required." });
             }
 
-            try
+            var supply = await context.Supplies.FindAsync(Supply_ID);
+            if (supply == null)
             {
-                var supply = await _context.Supplies.FindAsync(Supply_ID);
-                if (supply == null)
-                {
-                    return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
-                }
-
-                supply.Quantity += quantity;
-                _context.Supplies.Update(supply);
-                await _context.SaveChangesAsync();
-
-                return Ok(new 
-                { 
-                    message = "Stock added successfully.", 
-                    supply_ID = Supply_ID,
-                    added_quantity = quantity,
-                    new_total = supply.Quantity 
-                });
+                return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
             }
-            catch (Exception ex)
+
+            supply.Quantity += request.Quantity;
+            await context.SaveChangesAsync();
+
+            return Ok(new
             {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
-            }
+                message = "Stock added successfully.",
+                supply_ID = Supply_ID,
+                added_quantity = request.Quantity,
+                new_total = supply.Quantity
+            });
         }
 
         // DELETE: /Supply/{id}
         [HttpDelete("{Supply_ID}")]
         public async Task<IActionResult> DeleteSupply(int Supply_ID)
         {
-            try
+            var supply = await context.Supplies.FindAsync(Supply_ID);
+            if (supply == null)
             {
-                var supply = await _context.Supplies
-                    .Include(s => s.StockTransactions)
-                    .FirstOrDefaultAsync(s => s.Supply_ID == Supply_ID);
-
-                if (supply == null)
-                {
-                    return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
-                }
-
-                // Check if supply has associated transactions
-                if (supply.StockTransactions != null && supply.StockTransactions.Count > 0)
-                {
-                    return BadRequest(new 
-                    { 
-                        error = "Cannot delete supply with existing transactions.", 
-                        supply_ID = Supply_ID,
-                        transaction_count = supply.StockTransactions.Count,
-                        hint = "Delete all associated transactions first."
-                    });
-                }
-
-                _context.Supplies.Remove(supply);
-                await _context.SaveChangesAsync();
-
-                return Ok(new { message = "Supply deleted successfully.", supply_ID = Supply_ID });
+                return NotFound(new { error = "Supply not found.", supply_ID = Supply_ID });
             }
-            catch (Exception ex)
+
+            var transactionCount = await context.StockTransactions.CountAsync(st => st.Supply_ID == Supply_ID);
+            if (transactionCount > 0)
             {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
+                return BadRequest(new
+                {
+                    error = "Cannot delete supply with existing transactions.",
+                    supply_ID = Supply_ID,
+                    transaction_count = transactionCount,
+                    hint = "Delete all associated transactions first."
+                });
             }
+
+            context.Supplies.Remove(supply);
+            await context.SaveChangesAsync();
+
+            return Ok(new { message = "Supply deleted successfully.", supply_ID = Supply_ID });
         }
     }
 }

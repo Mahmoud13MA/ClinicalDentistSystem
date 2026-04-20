@@ -22,9 +22,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
 
 
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
             var validRegistrationKey = configuration["RegistrationSettings:AdminRegistrationKey"];
             if (string.IsNullOrEmpty(validRegistrationKey))
             {
@@ -62,8 +59,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
         public async Task<IActionResult> AdminLogin([FromBody] AdminLoginRequest request)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
             var admin = await context.Admins.FirstOrDefaultAsync(a => a.Email == normalizedEmail);
 
@@ -86,9 +81,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
         public async Task<IActionResult>DoctorUpdateCredentialsRequest([FromBody] UpdateCredentialsRequest request,int id)
         {
-
-
-            if (!ModelState.IsValid) return BadRequest(ModelState);
             var doctor = await context.Doctors.FindAsync(id);
             if (doctor == null) return NotFound(new { error = "Doctor Not Found" });
 
@@ -117,8 +109,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPut("nurses/{id:int}/credentials")]
         public async Task<IActionResult> NurseUpdateCredentialsRequest([FromBody]UpdateCredentialsRequest request,int id)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var nurse = await context.Nurses.FindAsync(id);
             if (nurse == null) return NotFound(new { error = "Nurse Not Found " });
 

@@ -28,19 +28,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Partial text is required" });
             }
 
-            try
-            {
-                var suggestions = await _llamaService.GetAutoCompleteSuggestionsAsync(
-                    request.PartialText, 
-                    request.Context ?? ""
-                );
-                
-                return Ok(new { suggestions });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Auto-complete failed", message = ex.Message });
-            }
+            var suggestions = await _llamaService.GetAutoCompleteSuggestionsAsync(request.PartialText, request.Context ?? "");
+            return Ok(new { suggestions });
         }
 
         /// <summary>
@@ -54,15 +43,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Partial term is required" });
             }
 
-            try
-            {
-                var suggestions = await _llamaService.GetDentalTerminologySuggestionsAsync(request.PartialTerm);
-                return Ok(new { suggestions });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Terminology lookup failed", message = ex.Message });
-            }
+            var suggestions = await _llamaService.GetDentalTerminologySuggestionsAsync(request.PartialTerm);
+            return Ok(new { suggestions });
         }
 
         /// <summary>
@@ -76,19 +58,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Bullet points are required" });
             }
 
-            try
-            {
-                var notes = await _llamaService.GenerateClinicalNotesAsync(
-                    request.BulletPoints, 
-                    request.PatientContext ?? ""
-                );
-                
-                return Ok(new { generatedNotes = notes });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Note generation failed", message = ex.Message });
-            }
+            var notes = await _llamaService.GenerateClinicalNotesAsync(request.BulletPoints, request.PatientContext ?? "");
+            return Ok(new { generatedNotes = notes });
         }
 
         /// <summary>
@@ -102,19 +73,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Diagnosis is required" });
             }
 
-            try
-            {
-                var treatments = await _llamaService.SuggestTreatmentsAsync(
-                    request.Diagnosis, 
-                    request.PatientHistory ?? ""
-                );
-                
-                return Ok(new { treatments });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Treatment suggestion failed", message = ex.Message });
-            }
+            var treatments = await _llamaService.SuggestTreatmentsAsync(request.Diagnosis, request.PatientHistory ?? "");
+            return Ok(new { treatments });
         }
 
         /// <summary>
@@ -128,15 +88,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Free text is required" });
             }
 
-            try
-            {
-                var result = await _llamaService.ExtractClinicalDataAsync(request.FreeText);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Data extraction failed", message = ex.Message });
-            }
+            var result = await _llamaService.ExtractClinicalDataAsync(request.FreeText);
+            return Ok(result);
         }
 
         /// <summary>
@@ -144,7 +97,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         /// </summary>
         [HttpPost("parse-to-ehr")]
         public async Task<IActionResult> ParseToEHR(
-            [FromBody] ParseEHRRequest request, 
+            [FromBody] ParseEHRRequest request,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(request.LargeText))
@@ -157,67 +110,52 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Text exceeds maximum allowed length of 10,000 characters" });
             }
 
-            try
-            {
-                var result = await _llamaService.ParseToCompleteEHRAsync(
-                    request.LargeText, 
-                    request.PatientContext ?? "",
-                    cancellationToken
-                );
+            var result = await _llamaService.ParseToCompleteEHRAsync(request.LargeText, request.PatientContext ?? "", cancellationToken);
 
-                var response = new ParseEHRResponse
+            var response = new ParseEHRResponse
+            {
+                Success = true,
+                Message = "EHR fields extracted successfully",
+                ExtractedFields = new EHRFieldsResponse
                 {
-                    Success = true,
-                    Message = "EHR fields extracted successfully",
-                    ExtractedFields = new EHRFieldsResponse
+                    Allergies = result.Allergies,
+                    MedicalAlerts = result.MedicalAlerts,
+                    Diagnosis = result.Diagnosis,
+                    XRayFindings = result.XRayFindings,
+                    PeriodontalStatus = result.PeriodontalStatus,
+                    ClinicalNotes = result.ClinicalNotes,
+                    Recommendations = result.Recommendations,
+                    History = result.History,
+                    Treatments = result.Treatments,
+                    Medications = result.Medications?.Select(m => new MedicationData
                     {
-                        Allergies = result.Allergies,
-                        MedicalAlerts = result.MedicalAlerts,
-                        Diagnosis = result.Diagnosis,
-                        XRayFindings = result.XRayFindings,
-                        PeriodontalStatus = result.PeriodontalStatus,
-                        ClinicalNotes = result.ClinicalNotes,
-                        Recommendations = result.Recommendations,
-                        History = result.History,
-                        Treatments = result.Treatments,
-                        Medications = result.Medications?.Select(m => new MedicationData
-                        {
-                            Name = m.Name,
-                            Dosage = m.Dosage,
-                            Frequency = m.Frequency,
-                            Duration = m.Duration
-                        }).ToList(),
-                        Procedures = result.Procedures?.Select(p => new ProcedureData
-                        {
-                            Name = p.Name,
-                            Description = p.Description,
-                            Date = p.Date
-                        }).ToList(),
-                        AffectedTeeth = result.AffectedTeeth?.Select(t => new ToothData
-                        {
-                            ToothNumber = t.ToothNumber,
-                            Condition = t.Condition,
-                            Treatment = t.Treatment
-                        }).ToList(),
-                        XRays = result.XRays?.Select(x => new XRayData
-                        {
-                            Type = x.Type,
-                            Findings = x.Findings,
-                            Date = x.Date
-                        }).ToList()
-                    }
-                };
+                        Name = m.Name,
+                        Dosage = m.Dosage,
+                        Frequency = m.Frequency,
+                        Duration = m.Duration
+                    }).ToList(),
+                    Procedures = result.Procedures?.Select(p => new ProcedureData
+                    {
+                        Name = p.Name,
+                        Description = p.Description,
+                        Date = p.Date
+                    }).ToList(),
+                    AffectedTeeth = result.AffectedTeeth?.Select(t => new ToothData
+                    {
+                        ToothNumber = t.ToothNumber,
+                        Condition = t.Condition,
+                        Treatment = t.Treatment
+                    }).ToList(),
+                    XRays = result.XRays?.Select(x => new XRayData
+                    {
+                        Type = x.Type,
+                        Findings = x.Findings,
+                        Date = x.Date
+                    }).ToList()
+                }
+            };
 
-                return Ok(response);
-            }
-            catch (OperationCanceledException)
-            {
-                return StatusCode(408, new { error = "Request timeout", message = "EHR parsing took too long and was cancelled" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "EHR parsing failed", message = ex.Message });
-            }
+            return Ok(response);
         }
     }
 }
