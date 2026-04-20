@@ -59,43 +59,21 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Patient data is required.", hint = "Make sure you're sending a valid JSON body with patient information." });
             }
 
-            if (!ModelState.IsValid)
+            var patient = new Patient
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
+                First = request.First,
+                Middle = request.Middle,
+                Last = request.Last,
+                Gender = request.Gender,
+                DOB = request.DOB,
+                Phone = request.Phone
+            };
 
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = errors,
-                    hint = "Required fields: First, Last, Gender, DOB (format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)"
-                });
-            }
+            _context.Patients.Add(patient);
+            await _context.SaveChangesAsync();
 
-            try
-            {
-                var patient = new Patient
-                {
-                    First = request.First,
-                    Middle = request.Middle,
-                    Last = request.Last,
-                    Gender = request.Gender,
-                    DOB = request.DOB,
-                    Phone = request.Phone
-                };
-
-                _context.Patients.Add(patient);
-                await _context.SaveChangesAsync();
-
-                var response = _mappingService.MapToResponse(patient);
-                return CreatedAtAction(nameof(GetPatientById), new { Patient_ID = patient.Patient_ID }, response);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
-            }
+            var response = _mappingService.MapToResponse(patient);
+            return CreatedAtAction(nameof(GetPatientById), new { Patient_ID = patient.Patient_ID }, response);
         }
 
         [HttpPut("{Patient_ID}")]
@@ -106,42 +84,20 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Patient data is required." });
             }
 
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
+            var result = await _profileManagement.UpdatePatientInfoAsync(Patient_ID, request);
 
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = errors
-                });
+            if (!result.IsSuccess)
+            {
+                if (result.ErrorMessage == "Patient not found")
+                    return NotFound(new { error = result.ErrorMessage, patient_ID = Patient_ID });
+
+                return BadRequest(new { error = result.ErrorMessage });
             }
 
-            try
-            {
-                var result = await _profileManagement.UpdatePatientInfoAsync(Patient_ID, request);
+            var updatedPatient = await _context.Patients.FindAsync(Patient_ID);
+            var response = _mappingService.MapToResponse(updatedPatient);
 
-                if (!result.IsSuccess)
-                {
-                    if (result.ErrorMessage == "Patient not found")
-                        return NotFound(new { error = result.ErrorMessage, patient_ID = Patient_ID });
-
-                    return BadRequest(new { error = result.ErrorMessage });
-                }
-
-                var updatedPatient = await _context.Patients.FindAsync(Patient_ID);
-                var response = _mappingService.MapToResponse(updatedPatient);
-
-                return Ok(new { message = "Patient updated successfully.", patient = response });
-            }
-            catch (Exception ex)
-            {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
-            }
+            return Ok(new { message = "Patient updated successfully.", patient = response });
         }
     }
 }   

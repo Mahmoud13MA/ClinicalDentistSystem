@@ -1,6 +1,7 @@
 using clinical.APIs.Modules.DentalClinic.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Modules.DentalClinic.DTOs;
@@ -11,15 +12,26 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
     [Authorize(Policy = "DoctorOnly")]
     [ApiController]
     [Route("[controller]")]
-    public class StockTransactionController : Controller
+    public class StockTransactionController(AppDbContext context, IStockTransactionMappingService mappingService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IStockTransactionMappingService _mappingService;
+        private IQueryable<Stock_Transaction> StockTransactionsWithDetails => context.StockTransactions
+            .Include(st => st.Doctor)
+            .Include(st => st.Supply);
 
-        public StockTransactionController(AppDbContext context, IStockTransactionMappingService mappingService)
+        private static List<string> GetValidationErrors(ModelStateDictionary modelState)
         {
-            _context = context;
-            _mappingService = mappingService;
+            return modelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+        }
+
+        private async Task<StockTransactionResponse?> GetTransactionResponseAsync(int transactionId)
+        {
+            var transaction = await StockTransactionsWithDetails
+                .FirstOrDefaultAsync(st => st.T_ID == transactionId);
+
+            return transaction == null ? null : mappingService.MapToResponse(transaction);
         }
 
         // GET: /StockTransaction
@@ -27,35 +39,27 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [Route("")]
         public async Task<IActionResult> GetStockTransactions()
         {
-            var transactions = await _context.StockTransactions
-                .Include(st => st.Doctor)
-                .Include(st => st.Supply)
-                .ToListAsync();
+            var transactions = await StockTransactionsWithDetails.ToListAsync();
 
-            if (transactions == null || transactions.Count == 0)
+            if (transactions.Count == 0)
             {
                 return NotFound(new { message = "No stock transactions found." });
             }
 
-            var response = _mappingService.MapToResponseList(transactions);
-            return Ok(response);
+            return Ok(mappingService.MapToResponseList(transactions));
         }
 
         // GET: /StockTransaction/{id}
         [HttpGet("{T_ID}")]
         public async Task<IActionResult> GetStockTransactionById(int T_ID)
         {
-            var transaction = await _context.StockTransactions
-                .Include(st => st.Doctor)
-                .Include(st => st.Supply)
-                .FirstOrDefaultAsync(st => st.T_ID == T_ID);
+            var response = await GetTransactionResponseAsync(T_ID);
 
-            if (transaction == null)
+            if (response == null)
             {
                 return NotFound(new { error = "Stock transaction not found.", transaction_ID = T_ID });
             }
 
-            var response = _mappingService.MapToResponse(transaction);
             return Ok(response);
         }
 
@@ -63,38 +67,32 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpGet("Doctor/{Doctor_ID}")]
         public async Task<IActionResult> GetStockTransactionsByDoctor(int Doctor_ID)
         {
-            var transactions = await _context.StockTransactions
-                .Include(st => st.Doctor)
-                .Include(st => st.Supply)
+            var transactions = await StockTransactionsWithDetails
                 .Where(st => st.Doctor_ID == Doctor_ID)
                 .ToListAsync();
 
-            if (transactions == null || transactions.Count == 0)
+            if (transactions.Count == 0)
             {
                 return NotFound(new { message = "No transactions found for this doctor.", doctor_ID = Doctor_ID });
             }
 
-            var response = _mappingService.MapToResponseList(transactions);
-            return Ok(response);
+            return Ok(mappingService.MapToResponseList(transactions));
         }
 
         // GET: /StockTransaction/Supply/{id}
         [HttpGet("Supply/{Supply_ID}")]
         public async Task<IActionResult> GetStockTransactionsBySupply(int Supply_ID)
         {
-            var transactions = await _context.StockTransactions
-                .Include(st => st.Doctor)
-                .Include(st => st.Supply)
+            var transactions = await StockTransactionsWithDetails
                 .Where(st => st.Supply_ID == Supply_ID)
                 .ToListAsync();
 
-            if (transactions == null || transactions.Count == 0)
+            if (transactions.Count == 0)
             {
                 return NotFound(new { message = "No transactions found for this supply.", supply_ID = Supply_ID });
             }
 
-            var response = _mappingService.MapToResponseList(transactions);
-            return Ok(response);
+            return Ok(mappingService.MapToResponseList(transactions));
         }
 
         // POST: /StockTransaction
@@ -108,77 +106,57 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             if (!ModelState.IsValid)
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-
                 return BadRequest(new
                 {
                     error = "Validation failed",
-                    details = errors,
+                    details = GetValidationErrors(ModelState),
                     hint = "Required fields: Date (format: YYYY-MM-DD), Time (format: HH:mm:ss), Quantity, Doctor_ID, Supply_ID"
                 });
             }
 
-            try
+            var doctorExists = await context.Doctors.AnyAsync(d => d.ID == request.Doctor_ID);
+            if (!doctorExists)
             {
-                // Validate that Doctor exists
-                var doctorExists = await _context.Doctors.AnyAsync(d => d.ID == request.Doctor_ID);
-                if (!doctorExists)
-                {
-                    return BadRequest(new { error = "Invalid Doctor_ID. Doctor does not exist.", doctor_ID = request.Doctor_ID });
-                }
-
-                // Validate that Supply exists
-                var supplyExists = await _context.Supplies.AnyAsync(s => s.Supply_ID == request.Supply_ID);
-                if (!supplyExists)
-                {
-                    return BadRequest(new { error = "Invalid Supply_ID. Supply does not exist.", supply_ID = request.Supply_ID });
-                }
-
-                // Check if supply has enough quantity
-                var supply = await _context.Supplies.FindAsync(request.Supply_ID);
-                if (supply.Quantity < request.Quantity)
-                {
-                    return BadRequest(new 
-                    { 
-                        error = "Insufficient supply quantity.", 
-                        available = supply.Quantity, 
-                        requested = request.Quantity 
-                    });
-                }
-
-                // Deduct quantity from supply
-                supply.Quantity -= request.Quantity;
-                _context.Supplies.Update(supply);
-
-                var transaction = new Stock_Transaction
-                {
-                    Date = request.Date,
-                    Time = request.Time,
-                    Quantity = request.Quantity,
-                    Doctor_ID = request.Doctor_ID,
-                    Supply_ID = request.Supply_ID
-                };
-
-                _context.StockTransactions.Add(transaction);
-                await _context.SaveChangesAsync();
-
-                // Load related entities for response
-                var createdTransaction = await _context.StockTransactions
-                    .Include(st => st.Doctor)
-                    .Include(st => st.Supply)
-                    .FirstOrDefaultAsync(st => st.T_ID == transaction.T_ID);
-
-                var response = _mappingService.MapToResponse(createdTransaction);
-                return CreatedAtAction(nameof(GetStockTransactionById), new { T_ID = transaction.T_ID }, response);
+                return BadRequest(new { error = "Invalid Doctor_ID. Doctor does not exist.", doctor_ID = request.Doctor_ID });
             }
-            catch (Exception ex)
+
+            var supply = await context.Supplies.FindAsync(request.Supply_ID);
+            if (supply == null)
             {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
+                return BadRequest(new { error = "Invalid Supply_ID. Supply does not exist.", supply_ID = request.Supply_ID });
             }
+
+            if (supply.Quantity < request.Quantity)
+            {
+                return BadRequest(new
+                {
+                    error = "Insufficient supply quantity.",
+                    available = supply.Quantity,
+                    requested = request.Quantity
+                });
+            }
+
+            supply.Quantity -= request.Quantity;
+
+            var transaction = new Stock_Transaction
+            {
+                Date = request.Date,
+                Time = request.Time,
+                Quantity = request.Quantity,
+                Doctor_ID = request.Doctor_ID,
+                Supply_ID = request.Supply_ID
+            };
+
+            context.StockTransactions.Add(transaction);
+            await context.SaveChangesAsync();
+
+            var response = await GetTransactionResponseAsync(transaction.T_ID);
+            if (response == null)
+            {
+                return StatusCode(500, new { error = "Internal server error", message = "Created stock transaction could not be loaded." });
+            }
+
+            return CreatedAtAction(nameof(GetStockTransactionById), new { T_ID = transaction.T_ID }, response);
         }
 
         // PUT: /StockTransaction/{id}
@@ -197,127 +175,100 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             if (!ModelState.IsValid)
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-
                 return BadRequest(new
                 {
                     error = "Validation failed",
-                    details = errors
+                    details = GetValidationErrors(ModelState)
                 });
             }
 
-            try
+            var existingTransaction = await context.StockTransactions.FindAsync(T_ID);
+            if (existingTransaction == null)
             {
-                // Check if transaction exists
-                var existingTransaction = await _context.StockTransactions.FindAsync(T_ID);
-                if (existingTransaction == null)
+                return NotFound(new { error = "Stock transaction not found.", transaction_ID = T_ID });
+            }
+
+            var doctorExists = await context.Doctors.AnyAsync(d => d.ID == request.Doctor_ID);
+            if (!doctorExists)
+            {
+                return BadRequest(new { error = "Invalid Doctor_ID. Doctor does not exist.", doctor_ID = request.Doctor_ID });
+            }
+
+            var supplyExists = await context.Supplies.AnyAsync(s => s.Supply_ID == request.Supply_ID);
+            if (!supplyExists)
+            {
+                return BadRequest(new { error = "Invalid Supply_ID. Supply does not exist.", supply_ID = request.Supply_ID });
+            }
+
+            if (existingTransaction.Quantity != request.Quantity || existingTransaction.Supply_ID != request.Supply_ID)
+            {
+                var oldSupply = await context.Supplies.FindAsync(existingTransaction.Supply_ID);
+                if (oldSupply == null)
                 {
-                    return NotFound(new { error = "Stock transaction not found.", transaction_ID = T_ID });
+                    return BadRequest(new { error = "Original supply not found.", supply_ID = existingTransaction.Supply_ID });
                 }
 
-                // Validate that Doctor exists
-                var doctorExists = await _context.Doctors.AnyAsync(d => d.ID == request.Doctor_ID);
-                if (!doctorExists)
+                oldSupply.Quantity += existingTransaction.Quantity;
+
+                var newSupply = await context.Supplies.FindAsync(request.Supply_ID);
+                if (newSupply == null)
                 {
-                    return BadRequest(new { error = "Invalid Doctor_ID. Doctor does not exist.", doctor_ID = request.Doctor_ID });
+                    return BadRequest(new { error = "Target supply not found.", supply_ID = request.Supply_ID });
                 }
 
-                // Validate that Supply exists
-                var supplyExists = await _context.Supplies.AnyAsync(s => s.Supply_ID == request.Supply_ID);
-                if (!supplyExists)
+                if (newSupply.Quantity < request.Quantity)
                 {
-                    return BadRequest(new { error = "Invalid Supply_ID. Supply does not exist.", supply_ID = request.Supply_ID });
-                }
-
-                // If quantity changed, adjust supply inventory
-                if (existingTransaction.Quantity != request.Quantity || existingTransaction.Supply_ID != request.Supply_ID)
-                {
-                    // Restore old quantity to old supply
-                    var oldSupply = await _context.Supplies.FindAsync(existingTransaction.Supply_ID);
-                    oldSupply.Quantity += existingTransaction.Quantity;
-
-                    // Deduct new quantity from new supply
-                    var newSupply = await _context.Supplies.FindAsync(request.Supply_ID);
-                    if (newSupply.Quantity < request.Quantity)
+                    oldSupply.Quantity -= existingTransaction.Quantity;
+                    return BadRequest(new
                     {
-                        return BadRequest(new 
-                        { 
-                            error = "Insufficient supply quantity.", 
-                            available = newSupply.Quantity, 
-                            requested = request.Quantity 
-                        });
-                    }
-                    newSupply.Quantity -= request.Quantity;
-
-                    _context.Supplies.Update(oldSupply);
-                    _context.Supplies.Update(newSupply);
+                        error = "Insufficient supply quantity.",
+                        available = newSupply.Quantity,
+                        requested = request.Quantity
+                    });
                 }
 
-                // Update transaction properties
-                existingTransaction.Date = request.Date;
-                existingTransaction.Time = request.Time;
-                existingTransaction.Quantity = request.Quantity;
-                existingTransaction.Doctor_ID = request.Doctor_ID;
-                existingTransaction.Supply_ID = request.Supply_ID;
-
-                _context.StockTransactions.Update(existingTransaction);
-                await _context.SaveChangesAsync();
-
-                // Load related entities for response
-                var updatedTransaction = await _context.StockTransactions
-                    .Include(st => st.Doctor)
-                    .Include(st => st.Supply)
-                    .FirstOrDefaultAsync(st => st.T_ID == T_ID);
-
-                var response = _mappingService.MapToResponse(updatedTransaction);
-                return Ok(new { message = "Stock transaction updated successfully.", transaction = response });
+                newSupply.Quantity -= request.Quantity;
             }
-            catch (DbUpdateConcurrencyException)
+
+            existingTransaction.Date = request.Date;
+            existingTransaction.Time = request.Time;
+            existingTransaction.Quantity = request.Quantity;
+            existingTransaction.Doctor_ID = request.Doctor_ID;
+            existingTransaction.Supply_ID = request.Supply_ID;
+
+            await context.SaveChangesAsync();
+
+            var response = await GetTransactionResponseAsync(T_ID);
+            if (response == null)
             {
-                // Check if transaction still exists
-                if (!await _context.StockTransactions.AnyAsync(st => st.T_ID == T_ID))
-                {
-                    return NotFound(new { error = "Stock transaction not found during update.", transaction_ID = T_ID });
-                }
-                throw;
+                return StatusCode(500, new { error = "Internal server error", message = "Updated stock transaction could not be loaded." });
             }
-            catch (Exception ex)
-            {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
-            }
+
+            return Ok(new { message = "Stock transaction updated successfully.", transaction = response });
         }
 
         // DELETE: /StockTransaction/{id}
         [HttpDelete("{T_ID}")]
         public async Task<IActionResult> DeleteStockTransaction(int T_ID)
         {
-            try
+            var transaction = await context.StockTransactions.FindAsync(T_ID);
+            if (transaction == null)
             {
-                var transaction = await _context.StockTransactions.FindAsync(T_ID);
-                if (transaction == null)
-                {
-                    return NotFound(new { error = "Stock transaction not found.", transaction_ID = T_ID });
-                }
-
-                // Restore quantity to supply when deleting transaction
-                var supply = await _context.Supplies.FindAsync(transaction.Supply_ID);
-                supply.Quantity += transaction.Quantity;
-                _context.Supplies.Update(supply);
-
-                _context.StockTransactions.Remove(transaction);
-                await _context.SaveChangesAsync();
-
-                return Ok(new { message = "Stock transaction deleted successfully.", transaction_ID = T_ID });
+                return NotFound(new { error = "Stock transaction not found.", transaction_ID = T_ID });
             }
-            catch (Exception ex)
+
+            var supply = await context.Supplies.FindAsync(transaction.Supply_ID);
+            if (supply == null)
             {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
+                return BadRequest(new { error = "Associated supply not found.", supply_ID = transaction.Supply_ID });
             }
+
+            supply.Quantity += transaction.Quantity;
+
+            context.StockTransactions.Remove(transaction);
+            await context.SaveChangesAsync();
+
+            return Ok(new { message = "Stock transaction deleted successfully.", transaction_ID = T_ID });
         }
     }
 }

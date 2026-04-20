@@ -5,14 +5,14 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
         public int Appointment_ID { get; set; }
         public DateTime Date { get; set; }
         public TimeSpan Time { get; set; }
-        public string Ref_Num { get; set; }
-        public string Type { get; set; }
+        public string Ref_Num { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public int Patient_ID { get; set; }
-        public PatientBasicInfo Patient { get; set; }
+        public PatientBasicInfo Patient { get; set; } = new();
         public int Doctor_ID { get; set; }
-        public DoctorBasicInfo Doctor { get; set; }
+        public DoctorBasicInfo Doctor { get; set; } = new();
         public int Nurse_ID { get; set; }
-        public NurseBasicInfo Nurse { get; set; }
+        public NurseBasicInfo Nurse { get; set; } = new();
     }
 
     public class PatientBasicInfo

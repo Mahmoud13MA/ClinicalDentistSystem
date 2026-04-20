@@ -19,8 +19,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         private readonly IEmailValidationService _emailValidationService;
 
         public DoctorAuthController(
-            AppDbContext context, 
-            IJwtService jwtService, 
+            AppDbContext context,
+            IJwtService jwtService,
             IPasswordHashService passwordHashService,
             IConfiguration configuration,
             IEmailValidationService emailValidationService)
@@ -41,70 +41,45 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Registration data is required." });
             }
 
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
+            var validRegistrationKey = _configuration["RegistrationSettings:DoctorRegistrationKey"];
 
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = errors
-                });
+            if (string.IsNullOrEmpty(validRegistrationKey))
+            {
+                return StatusCode(500, new { error = "Server configuration error. Contact system administrator." });
             }
 
-            try
+            if (request.RegistrationKey != validRegistrationKey)
             {
-                // Validate registration key
-                var validRegistrationKey = _configuration["RegistrationSettings:DoctorRegistrationKey"];
-                
-                if (string.IsNullOrEmpty(validRegistrationKey))
-                {
-                    return StatusCode(500, new { error = "Server configuration error. Contact system administrator." });
-                }
-
-                if (request.RegistrationKey != validRegistrationKey)
-                {
-                    return Unauthorized(new { error = "Invalid registration key. Contact your clinic administrator for the correct key." });
-                }
-
-                // Check if email already exists
-                var isEmailUsed = await _emailValidationService.IsEmailUsedAsync(request.Email);
-                if (isEmailUsed)
-                {
-                    return BadRequest(new { error = "Email already registered." });
-                }
-
-                // Create new doctor
-                var doctor = new Doctor
-                {
-                    Name = request.Name,
-                    Phone = request.Phone,
-                    Email = request.Email.Trim().ToLowerInvariant(),
-                    PasswordHash = _passwordHashService.HashPassword(request.Password)
-                };
-
-                _context.Doctors.Add(doctor);
-                await _context.SaveChangesAsync();
-
-                var token = _jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
-
-                return Ok(new DoctorLoginResponse
-                {
-                    Token = token,
-                    DoctorId = doctor.ID,
-                    Name = doctor.Name,
-                    Email = doctor.Email,
-                    Phone = doctor.Phone
-                });
+                return Unauthorized(new { error = "Invalid registration key. Contact your clinic administrator for the correct key." });
             }
-            catch (Exception ex)
+
+            var isEmailUsed = await _emailValidationService.IsEmailUsedAsync(request.Email);
+            if (isEmailUsed)
             {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
+                return BadRequest(new { error = "Email already registered." });
             }
+
+            var doctor = new Doctor
+            {
+                Name = request.Name,
+                Phone = request.Phone,
+                Email = request.Email.Trim().ToLowerInvariant(),
+                PasswordHash = _passwordHashService.HashPassword(request.Password)
+            };
+
+            _context.Doctors.Add(doctor);
+            await _context.SaveChangesAsync();
+
+            var token = _jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
+
+            return Ok(new DoctorLoginResponse
+            {
+                Token = token,
+                DoctorId = doctor.ID,
+                Name = doctor.Name,
+                Email = doctor.Email,
+                Phone = doctor.Phone
+            });
         }
 
         // POST: api/DoctorAuth/Login
@@ -116,45 +91,23 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return BadRequest(new { error = "Login data is required." });
             }
 
-            if (!ModelState.IsValid)
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Email == normalizedEmail);
+            if (doctor == null || !_passwordHashService.VerifyPassword(request.Password, doctor.PasswordHash))
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = errors
-                });
+                return Unauthorized(new { error = "Invalid email or password." });
             }
 
-            try
-            {
-                var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-                var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Email == normalizedEmail);
-                if (doctor == null || !_passwordHashService.VerifyPassword(request.Password, doctor.PasswordHash))
-                {
-                    return Unauthorized(new { error = "Invalid email or password." });
-                }
+            var token = _jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
 
-                var token = _jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
-
-                return Ok(new DoctorLoginResponse
-                {
-                    Token = token,
-                    DoctorId = doctor.ID,
-                    Name = doctor.Name,
-                    Email = doctor.Email,
-                    Phone = doctor.Phone
-                });
-            }
-            catch (Exception ex)
+            return Ok(new DoctorLoginResponse
             {
-                var innerMessage = ex.InnerException?.Message ?? ex.Message;
-                return StatusCode(500, new { error = "Internal server error", message = innerMessage });
-            }
+                Token = token,
+                DoctorId = doctor.ID,
+                Name = doctor.Name,
+                Email = doctor.Email,
+                Phone = doctor.Phone
+            });
         }
     }
 }

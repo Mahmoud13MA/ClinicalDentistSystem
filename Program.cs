@@ -9,7 +9,6 @@ using Microsoft.OpenApi.Models;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure Kestrel with fallback ports if primary ports are in use
@@ -47,6 +46,10 @@ static int FindAvailablePort(int startPort)
 
 // Configure services
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Connection string 'DefaultConnection' is missing or empty.");
+}
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -81,7 +84,14 @@ builder.Services.AddDentalClinicModule();
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"]!;
+var secretKey = jwtSettings["SecretKey"];
+var issuer = jwtSettings["Issuer"];
+var audience = jwtSettings["Audience"];
+
+if (string.IsNullOrWhiteSpace(secretKey) || string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
+{
+    throw new InvalidOperationException("JwtSettings configuration is incomplete. SecretKey, Issuer, and Audience are required.");
+}
 
 builder.Services.AddAuthentication(options =>
 {
@@ -96,8 +106,8 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
+        ValidIssuer = issuer, // Use the validated variable
+        ValidAudience = audience, // Use the validated variable
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
     };
     options.MapInboundClaims = false;
@@ -153,17 +163,7 @@ await ollama.StartWithFallbackAsync();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try
-    {
-        Console.WriteLine("Initializing database...");
-        context.Database.Migrate();
-        Console.WriteLine($"✓ Database ready: {context.Database.GetDbConnection().Database}");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Database error: {ex.Message}");
-        Console.WriteLine("Install SQL Server LocalDB: https://aka.ms/sqlexpress");
-    }
+    await context.Database.MigrateAsync();
 }
 
 // Configure pipeline
@@ -172,12 +172,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseExceptionHandler("/error");
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 app.UseCors("AllowNextJs");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.Map("/error", () => Results.Problem("An unexpected server error occurred."));
 
 // Cleanup on shutdown
 app.Lifetime.ApplicationStopping.Register(ollama.Stop);
