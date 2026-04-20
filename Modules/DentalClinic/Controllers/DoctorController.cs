@@ -13,47 +13,36 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
     [Authorize(Policy ="DoctorOnly")]
     [ApiController]
     [Route("[controller]")]
-    public class DoctorController : ControllerBase
+    public class DoctorController(AppDbContext context,IDoctorMappingService mappingService , IEmailValidationService emailValidationService ,IProfileManagementService profileManagementService , IPasswordHashService passwordHashService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IDoctorMappingService _mappingService;
-        private readonly IPasswordHashService _passwordHashService;
-        private readonly IEmailValidationService _emailValidationService;
-        private readonly IProfileManagementService _profileManagement;
+       
 
-        public DoctorController(AppDbContext context, IDoctorMappingService mappingService, IPasswordHashService passwordHashService, IEmailValidationService emailValidationService, IProfileManagementService profileManagement)
-        {
-            _context = context;
-            _mappingService = mappingService;
-            _passwordHashService = passwordHashService;
-            _emailValidationService = emailValidationService;
-            _profileManagement = profileManagement;
-        }
+    
 
         [HttpGet]
         [Route("")]
         public async Task<IActionResult> GetDoctor()
         {
-            var doctors = await _context.Doctors.ToListAsync();
+            var doctors = await context.Doctors.ToListAsync();
             if (doctors == null || doctors.Count == 0)
             {
                 return NotFound();
             }
 
-            var response = _mappingService.MapToResponseList(doctors);
+            var response = mappingService.MapToResponseList(doctors);
             return Ok(response);
         }
 
         [HttpGet("{ID}")]
         public async Task<IActionResult> GetDoctorById(int ID)
         {
-            var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.ID == ID);
+            var doctor = await context.Doctors.FirstOrDefaultAsync(d => d.ID == ID);
             if (doctor == null)
             {
                 return NotFound();
             }
 
-            var response = _mappingService.MapToResponse(doctor);
+            var response = mappingService.MapToResponse(doctor);
             return Ok(response);
         }
 
@@ -83,7 +72,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             try
             {
                 // Check if email already exists
-                var emailExists = await _emailValidationService.IsEmailUsedAsync(request.Email);
+                var emailExists = await emailValidationService.IsEmailUsedAsync(request.Email);
                 if (emailExists)
                 {
                     return BadRequest(new { error = "Email already registered." });
@@ -94,13 +83,13 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                     Name = request.Name,
                     Phone = request.Phone,
                     Email = request.Email.Trim().ToLowerInvariant(),
-                    PasswordHash = _passwordHashService.HashPassword(request.Password)
+                    PasswordHash = passwordHashService.HashPassword(request.Password)
                 };
 
-                _context.Doctors.Add(doctor);
-                await _context.SaveChangesAsync();
+                context.Doctors.Add(doctor);
+                await context.SaveChangesAsync();
 
-                var response = _mappingService.MapToResponse(doctor);
+                var response = mappingService.MapToResponse(doctor);
                 return CreatedAtAction(nameof(GetDoctorById), new { ID = doctor.ID }, response);
             }
             catch (Exception ex)
@@ -133,7 +122,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             try
             {
-                var result = await _profileManagement.UpdateDoctorInfoAsync(ID, request);
+                var result = await profileManagementService.UpdateDoctorInfoAsync(ID, request);
 
                 if (!result.IsSuccess)
                 {
@@ -144,8 +133,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 }
 
                 // Fetch updated doctor to return
-                var updatedDoctor = await _context.Doctors.FindAsync(ID);
-                var response = _mappingService.MapToResponse(updatedDoctor);
+                var updatedDoctor = await context.Doctors.FindAsync(ID);
+                var response = mappingService.MapToResponse(updatedDoctor);
 
                 return Ok(new { message = "Doctor updated successfully.", doctor = response });
             }
