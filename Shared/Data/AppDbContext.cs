@@ -24,11 +24,13 @@ namespace clinical.APIs.Shared.Data
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction> StockTransactions { get; set; }
 
         // Radiology Module DbSets
-        public DbSet<Radiologist> Radiologists { get; set; }
+        public DbSet<Radiology.Models.Radiologist> Radiologists { get; set; }
         public DbSet<Radiology.Models.Patient> RadiologyPatients { get; set; }
-        public DbSet<ImagingAppointment> ImagingAppointments { get; set; }
-        public DbSet<Equipment> Equipment { get; set; }
-        public DbSet<Report> Reports { get; set; }
+        public DbSet<Radiology.Models.ImagingAppointment> ImagingAppointments { get; set; }
+        public DbSet<Radiology.Models.Equipment> Equipment { get; set; }
+        public DbSet<Radiology.Models.Report> Reports { get; set; }
+
+        public DbSet<clinical.APIs.Shared.Models.ProcessedRequest> ProcessedRequests { get; set; }
 
         public DbSet<Admin> Admins { get; set; }
 
@@ -121,7 +123,26 @@ namespace clinical.APIs.Shared.Data
                 .WithMany(e => e.XRays)
                 .HasForeignKey(x => x.EHR_ID)
                 .OnDelete(DeleteBehavior.Cascade);
-        }
-    }
-    }
+                    // Radiology Module relationships
+                    modelBuilder.Entity<Report>()
+                        .HasOne(r => r.Radiologist)
+                        .WithMany(rad => rad.Reports)
+                        .HasForeignKey(r => r.RadiologistID)
+                        .OnDelete(DeleteBehavior.Restrict);
 
+                    modelBuilder.Entity<Report>()
+                        .HasOne(r => r.Patient)
+                        .WithMany(p => p.Reports)
+                        .HasForeignKey(r => r.PatientID)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    modelBuilder.Entity<Report>()
+                        .HasOne(r => r.ImagingAppointment)
+                        .WithMany(i => i.Reports)
+                        .HasForeignKey(r => r.ImagingID)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+
+                }
+            }
+        }

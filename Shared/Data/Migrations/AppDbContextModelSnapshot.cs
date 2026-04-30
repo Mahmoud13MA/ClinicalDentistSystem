@@ -8,7 +8,7 @@ using clinical.APIs.Shared.Data;
 
 #nullable disable
 
-namespace clinical.APIs.Shared.Data.Migrations
+namespace clinical.APIs.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
@@ -21,6 +21,155 @@ namespace clinical.APIs.Shared.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Radiology.Models.Equipment", b =>
+                {
+                    b.Property<int>("EquipmentID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EquipmentID"));
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("ServiceDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("EquipmentID");
+
+                    b.ToTable("Equipment");
+                });
+
+            modelBuilder.Entity("Radiology.Models.ImagingAppointment", b =>
+                {
+                    b.Property<int>("ImagingID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ImagingID"));
+
+                    b.Property<DateTime>("Datetime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EquipmentID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PatientID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RadiologistID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("ImagingID");
+
+                    b.HasIndex("EquipmentID");
+
+                    b.HasIndex("PatientID");
+
+                    b.HasIndex("RadiologistID");
+
+                    b.ToTable("ImagingAppointments");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Patient", b =>
+                {
+                    b.Property<int>("PatientID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PatientID"));
+
+                    b.HasKey("PatientID");
+
+                    b.ToTable("RadiologyPatients");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Radiologist", b =>
+                {
+                    b.Property<int>("RadiologistID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RadiologistID"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Specialty")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("RadiologistID");
+
+                    b.ToTable("Radiologists");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Report", b =>
+                {
+                    b.Property<int>("ReportID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReportID"));
+
+                    b.Property<string>("Diagnosis")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Findings")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ImagingID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PatientID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RadiologistID")
+                        .HasColumnType("int");
+
+                    b.HasKey("ReportID");
+
+                    b.HasIndex("ImagingID");
+
+                    b.HasIndex("PatientID");
+
+                    b.HasIndex("RadiologistID");
+
+                    b.ToTable("Reports");
+                });
 
             modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Admin", b =>
                 {
@@ -513,6 +662,84 @@ namespace clinical.APIs.Shared.Data.Migrations
                     b.ToTable("XRayRecords");
                 });
 
+            modelBuilder.Entity("clinical.APIs.Shared.Models.ProcessedRequest", b =>
+                {
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Route")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("IdempotencyKey");
+
+                    b.ToTable("ProcessedRequests");
+                });
+
+            modelBuilder.Entity("Radiology.Models.ImagingAppointment", b =>
+                {
+                    b.HasOne("Radiology.Models.Equipment", "Equipment")
+                        .WithMany("ImagingAppointments")
+                        .HasForeignKey("EquipmentID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Radiology.Models.Patient", "Patient")
+                        .WithMany("ImagingAppointments")
+                        .HasForeignKey("PatientID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Radiology.Models.Radiologist", "Radiologist")
+                        .WithMany("ImagingAppointments")
+                        .HasForeignKey("RadiologistID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("Radiologist");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Report", b =>
+                {
+                    b.HasOne("Radiology.Models.ImagingAppointment", "ImagingAppointment")
+                        .WithMany("Reports")
+                        .HasForeignKey("ImagingID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Radiology.Models.Patient", "Patient")
+                        .WithMany("Reports")
+                        .HasForeignKey("PatientID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Radiology.Models.Radiologist", "Radiologist")
+                        .WithMany("Reports")
+                        .HasForeignKey("RadiologistID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ImagingAppointment");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("Radiologist");
+                });
+
             modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Appointment", b =>
                 {
                     b.HasOne("clinical.APIs.Modules.DentalClinic.Models.Doctor", "Doctor")
@@ -647,6 +874,30 @@ namespace clinical.APIs.Shared.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("EHR");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Equipment", b =>
+                {
+                    b.Navigation("ImagingAppointments");
+                });
+
+            modelBuilder.Entity("Radiology.Models.ImagingAppointment", b =>
+                {
+                    b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Patient", b =>
+                {
+                    b.Navigation("ImagingAppointments");
+
+                    b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("Radiology.Models.Radiologist", b =>
+                {
+                    b.Navigation("ImagingAppointments");
+
+                    b.Navigation("Reports");
                 });
 
             modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Appointment", b =>
