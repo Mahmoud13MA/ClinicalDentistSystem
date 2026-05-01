@@ -7,229 +7,150 @@ using Radiology.Models;
 
 namespace clinical.APIs.Modules.Radiology.Controllers
 {
-    [Authorize]
+    [Authorize(Policy = "RadiologistOrAdmin")]
     [ApiController]
-    [Route("api/[controller]")]
-    public class ReportController : ControllerBase
+    [Route("api/v1/radiology/[controller]")]
+    public class ReportController(AppDbContext context) : ControllerBase
     {
-        private readonly AppDbContext _context;
 
-        public ReportController(AppDbContext context)
-        {
-            _context = context;
-        }
-
-        /// <summary>
-        /// Get all radiology reports
-        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetAllReports()
         {
-            try
-            {
-                var reports = await _context.Reports
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .ToListAsync();
+            var reports = await context.Reports
+                .Include(r => r.ImagingAppointment)
+                .Include(r => r.Radiologist)
+                .ToListAsync();
 
-                if (reports == null || reports.Count == 0)
-                {
-                    return NotFound(new { error = "No reports found." });
-                }
-
-                var response = reports.Select(r => MapToReportResponse(r)).ToList();
-                return Ok(response);
-            }
-            catch (Exception ex)
+            if (reports == null || reports.Count == 0)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return NotFound(new { error = "No reports found." });
             }
+
+            var response = reports.Select(r => MapToReportResponse(r)).ToList();
+            return Ok(response);
         }
 
-        /// <summary>
-        /// Get a specific report by ID
-        /// </summary>
+   
         [HttpGet("{reportId}")]
         public async Task<IActionResult> GetReportById(int reportId)
         {
-            try
-            {
-                var report = await _context.Reports
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .FirstOrDefaultAsync(r => r.ReportID == reportId);
+            var report = await context.Reports
+                .Include(r => r.ImagingAppointment)
+                .Include(r => r.Radiologist)
+                .FirstOrDefaultAsync(r => r.ReportID == reportId);
 
-                if (report == null)
-                {
-                    return NotFound(new { error = "Report not found", reportId = reportId });
-                }
-
-                var response = MapToReportResponse(report);
-                return Ok(response);
-            }
-            catch (Exception ex)
+            if (report == null)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return NotFound(new { error = "Report not found", reportId = reportId });
             }
+
+            var response = MapToReportResponse(report);
+            return Ok(response);
         }
 
-        /// <summary>
-        /// Get reports by imaging appointment
-        /// </summary>
         [HttpGet("byappointment/{imagingId}")]
         public async Task<IActionResult> GetReportsByImagingAppointment(int imagingId)
         {
-            try
-            {
-                var reports = await _context.Reports
-                    .Where(r => r.ImagingID == imagingId)
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .ToListAsync();
+            var reports = await context.Reports
+                .Where(r => r.ImagingID == imagingId)
+                .Include(r => r.ImagingAppointment)
+                .Include(r => r.Radiologist)
+                .ToListAsync();
 
-                if (reports == null || reports.Count == 0)
-                {
-                    return NotFound(new { error = "No reports found for this imaging appointment", imagingId = imagingId });
-                }
-
-                var response = reports.Select(r => MapToReportResponse(r)).ToList();
-                return Ok(response);
-            }
-            catch (Exception ex)
+            if (reports == null || reports.Count == 0)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return NotFound(new { error = "No reports found for this imaging appointment", imagingId = imagingId });
             }
+
+            var response = reports.Select(r => MapToReportResponse(r)).ToList();
+            return Ok(response);
         }
-
-        /// <summary>
-        /// Get reports by patient
-        /// </summary>
         [HttpGet("bypatient/{patientId}")]
         public async Task<IActionResult> GetReportsByPatient(int patientId)
         {
-            try
-            {
-                var reports = await _context.Reports
-                    .Where(r => r.PatientID == patientId)
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .ToListAsync();
+            var reports = await context.Reports
+                .Where(r => r.PatientID == patientId)
+                .Include(r => r.ImagingAppointment)
+                .Include(r => r.Radiologist)
+                .ToListAsync();
 
-                if (reports == null || reports.Count == 0)
-                {
-                    return NotFound(new { error = "No reports found for this patient", patientId = patientId });
-                }
-
-                var response = reports.Select(r => MapToReportResponse(r)).ToList();
-                return Ok(response);
-            }
-            catch (Exception ex)
+            if (reports == null || reports.Count == 0)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return NotFound(new { error = "No reports found for this patient", patientId = patientId });
             }
+
+            var response = reports.Select(r => MapToReportResponse(r)).ToList();
+            return Ok(response);
         }
 
-        /// <summary>
-        /// Get reports by radiologist
-        /// </summary>
+        
         [HttpGet("byradiologist/{radiologistId}")]
         public async Task<IActionResult> GetReportsByRadiologist(int radiologistId)
         {
-            try
-            {
-                var reports = await _context.Reports
-                    .Where(r => r.RadiologistID == radiologistId)
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .ToListAsync();
+            var reports = await context.Reports
+                .Where(r => r.RadiologistID == radiologistId)
+                .Include(r => r.ImagingAppointment)
+                .Include(r => r.Radiologist)
+                .ToListAsync();
 
-                if (reports == null || reports.Count == 0)
-                {
-                    return NotFound(new { error = "No reports found for this radiologist", radiologistId = radiologistId });
-                }
-
-                var response = reports.Select(r => MapToReportResponse(r)).ToList();
-                return Ok(response);
-            }
-            catch (Exception ex)
+            if (reports == null || reports.Count == 0)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return NotFound(new { error = "No reports found for this radiologist", radiologistId = radiologistId });
             }
+
+            var response = reports.Select(r => MapToReportResponse(r)).ToList();
+            return Ok(response);
         }
 
-        /// <summary>
-        /// Create a new report
-        /// </summary>
+       
         [HttpPost]
-        [AllowAnonymous]
         public async Task<IActionResult> CreateReport([FromBody] ReportCreateRequest request)
         {
-            if (request == null)
+          
+
+            var imaging = await context.ImagingAppointments.FindAsync(request.ImagingID);
+            if (imaging == null)
             {
-                return BadRequest(new { error = "Report data is required" });
+                return BadRequest(new { error = "Invalid imaging appointment ID" });
             }
 
-            if (!ModelState.IsValid)
+            var patientExists = await context.RadiologyPatients
+                .AnyAsync(p=>p.PatientID==request.PatientID);
+            if (!patientExists)
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-
-                return BadRequest(new { error = "Validation failed", details = errors });
+                return BadRequest(new { error = "Invalid patient ID" });
             }
 
-            try
+            var radiologist = await context.Radiologists
+                .FindAsync(request.RadiologistID);
+            if (radiologist== null)
             {
-                // Validate that imaging appointment exists
-                var imagingExists = await _context.ImagingAppointments
-                    .AnyAsync(ia => ia.ImagingID == request.ImagingID);
-                if (!imagingExists)
-                {
-                    return BadRequest(new { error = "Invalid imaging appointment ID" });
-                }
-
-                // Validate that patient exists
-                var patientExists = await _context.RadiologyPatients
-                    .AnyAsync(p => p.PatientID == request.PatientID);
-                if (!patientExists)
-                {
-                    return BadRequest(new { error = "Invalid patient ID" });
-                }
-
-                // Validate that radiologist exists
-                var radiologistExists = await _context.Radiologists
-                    .AnyAsync(r => r.RadiologistID == request.RadiologistID);
-                if (!radiologistExists)
-                {
-                    return BadRequest(new { error = "Invalid radiologist ID" });
-                }
-
-                var report = new Report
-                {
-                    Findings = request.Findings,
-                    Diagnosis = request.Diagnosis,
-                    ImagingID = request.ImagingID,
-                    PatientID = request.PatientID,
-                    RadiologistID = request.RadiologistID
-                };
-
-                _context.Reports.Add(report);
-                await _context.SaveChangesAsync();
-
-                // Fetch the created report with related data
-                var createdReport = await _context.Reports
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .FirstOrDefaultAsync(r => r.ReportID == report.ReportID);
-
-                var response = MapToReportResponse(createdReport);
-                return CreatedAtAction(nameof(GetReportById), new { reportId = report.ReportID }, response);
+                return BadRequest(new { error = "Invalid radiologist ID" });
             }
-            catch (Exception ex)
+
+            var report = new Report
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
-            }
+                Findings = request.Findings,
+                Diagnosis = request.Diagnosis,
+                ImagingID = request.ImagingID,
+                PatientID = request.PatientID,
+                RadiologistID = request.RadiologistID,
+
+                // for the mapper service
+
+                ImagingAppointment = imaging,
+                Radiologist=radiologist
+
+
+
+            };
+
+            context.Reports.Add(report);
+            await context.SaveChangesAsync();
+
+
+            var response = MapToReportResponse(report);
+            return CreatedAtAction(nameof(GetReportById), new { reportId = report.ReportID }, response);
         }
 
         /// <summary>
@@ -238,94 +159,64 @@ namespace clinical.APIs.Modules.Radiology.Controllers
         [HttpPut("{reportId}")]
         public async Task<IActionResult> UpdateReport(int reportId, [FromBody] ReportUpdateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Report data is required" });
-            }
+         
 
             if (reportId != request.ReportID)
             {
                 return BadRequest(new { error = "Report ID mismatch between URL and body" });
             }
 
-            if (!ModelState.IsValid)
+            var report = await context.Reports.FindAsync(reportId);
+            if (report == null)
             {
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-
-                return BadRequest(new { error = "Validation failed", details = errors });
+                return NotFound(new { error = "Report not found", reportId = reportId });
             }
 
-            try
+            // Validate that imaging appointment exists
+            var imaging = await context.ImagingAppointments
+                .FindAsync(request.ImagingID);
+            if (imaging == null)
             {
-                var report = await _context.Reports.FindAsync(reportId);
-                if (report == null)
-                {
-                    return NotFound(new { error = "Report not found", reportId = reportId });
-                }
-
-                // Validate that imaging appointment exists
-                var imagingExists = await _context.ImagingAppointments
-                    .AnyAsync(ia => ia.ImagingID == request.ImagingID);
-                if (!imagingExists)
-                {
-                    return BadRequest(new { error = "Invalid imaging appointment ID" });
-                }
-
-                // Validate that patient exists
-                var patientExists = await _context.RadiologyPatients
-                    .AnyAsync(p => p.PatientID == request.PatientID);
-                if (!patientExists)
-                {
-                    return BadRequest(new { error = "Invalid patient ID" });
-                }
-
-                // Validate that radiologist exists
-                var radiologistExists = await _context.Radiologists
-                    .AnyAsync(r => r.RadiologistID == request.RadiologistID);
-                if (!radiologistExists)
-                {
-                    return BadRequest(new { error = "Invalid radiologist ID" });
-                }
-
-                // Update report
-                report.Findings = request.Findings;
-                report.Diagnosis = request.Diagnosis;
-                report.ImagingID = request.ImagingID;
-                report.PatientID = request.PatientID;
-                report.RadiologistID = request.RadiologistID;
-
-                _context.Reports.Update(report);
-                await _context.SaveChangesAsync();
-
-                // Fetch updated report with related data
-                var updatedReport = await _context.Reports
-                    .Include(r => r.ImagingAppointment)
-                    .Include(r => r.Radiologist)
-                    .FirstOrDefaultAsync(r => r.ReportID == reportId);
-
-                var response = MapToReportResponse(updatedReport);
-                return Ok(new { message = "Report updated successfully", data = response });
+                return BadRequest(new { error = "Invalid imaging appointment ID" });
             }
-            catch (DbUpdateConcurrencyException)
+
+            // Validate that patient exists
+            var patientExists = await context.RadiologyPatients
+                .AnyAsync(p => p.PatientID == request.PatientID);
+            if (!patientExists)
             {
-                if (!await _context.Reports.AnyAsync(r => r.ReportID == reportId))
-                {
-                    return NotFound(new { error = "Report not found", reportId = reportId });
-                }
-                throw;
+                return BadRequest(new { error = "Invalid patient ID" });
             }
-            catch (Exception ex)
+
+            // Validate that radiologist exists
+            var radiologist = await context.Radiologists
+                .FindAsync(request.RadiologistID);
+            if (radiologist == null)
             {
-                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+                return BadRequest(new { error = "Invalid radiologist ID" });
             }
+
+            // Update report
+            report.Findings = request.Findings;
+            report.Diagnosis = request.Diagnosis;
+            report.ImagingID = request.ImagingID;
+            report.PatientID = request.PatientID;
+            report.RadiologistID = request.RadiologistID;
+
+            // for the mapping service 
+            report.ImagingAppointment = imaging;
+            report.Radiologist = radiologist;
+
+            
+
+            await context.SaveChangesAsync();
+
+          
+
+            var response = MapToReportResponse(report);
+            return Ok(new { message = "Report updated successfully", data = response });
         }
 
-        /// <summary>
-        /// Map Report model to ReportResponse DTO
-        /// </summary>
         private ReportResponse MapToReportResponse(Report report)
         {
             return new ReportResponse
