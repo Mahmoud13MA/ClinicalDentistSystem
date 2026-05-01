@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
-    [Authorize(Policy = "DoctorOnly")]
+    [Authorize(Roles = "Admin,Doctor")]
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/v1/clinic/[controller]")]
     public class SupplyController(AppDbContext context) : ControllerBase
     {
         private static StockTransactionBasicInfo MapStockTransactionToBasicInfo(Stock_Transaction transaction)
@@ -60,6 +60,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             var supplies = await context.Supplies
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
+                .AsSplitQuery()
                 .ToListAsync();
 
             if (supplies.Count == 0)
@@ -77,6 +78,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             var supply = await context.Supplies
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(s => s.Supply_ID == Supply_ID);
 
             if (supply == null)
@@ -92,9 +94,10 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         public async Task<IActionResult> GetSuppliesByCategory(string category)
         {
             var supplies = await context.Supplies
+                .Where(s => s.Category == category)
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
-                .Where(s => string.Equals(s.Category, category, StringComparison.OrdinalIgnoreCase))
+                .AsSplitQuery()
                 .ToListAsync();
 
             if (supplies.Count == 0)
@@ -125,11 +128,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateSupply([FromBody] SupplyCreateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Supply data is required.", hint = "Make sure you're sending a valid JSON body with supply information." });
-            }
-
             var supply = new Supply
             {
                 Supply_Name = request.Supply_Name,
@@ -149,11 +147,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPut("{Supply_ID}")]
         public async Task<IActionResult> UpdateSupply(int Supply_ID, [FromBody] SupplyUpdateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Supply data is required." });
-            }
-
             if (Supply_ID != request.Supply_ID)
             {
                 return BadRequest(new { error = "Supply ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
@@ -180,9 +173,9 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPatch("{Supply_ID}/AddStock")]
         public async Task<IActionResult> AddStock(int Supply_ID, [FromBody] SupplyAddStockRequest request)
         {
-            if (request == null)
+            if (request.Quantity <= 0)
             {
-                return BadRequest(new { error = "Supply data is required." });
+                return BadRequest(new { error = "Quantity to add must be greater than zero.", hint = "To deduct stock, process a transaction in the StockTransactionController." });
             }
 
             var supply = await context.Supplies.FindAsync(Supply_ID);

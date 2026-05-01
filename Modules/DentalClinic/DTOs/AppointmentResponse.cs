@@ -18,28 +18,28 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
     public class PatientBasicInfo
     {
         public int Patient_ID { get; set; }
-        public string First { get; set; }
-        public string Middle { get; set; }
-        public string Last { get; set; }
+        public string First { get; set; } = string.Empty;
+        public string Middle { get; set; } = string.Empty;
+        public string Last { get; set; } = string.Empty;
         public string FullName => $"{First} {Middle} {Last}".Replace("  ", " ").Trim();
-        public string Gender { get; set; }
+        public string Gender { get; set; } = string.Empty;
         public DateTime DOB { get; set; }
-        public string? Phone { get; set; }
+        public string? Phone { get; set; } = string.Empty;
     }
 
     public class DoctorBasicInfo
     {
         public int ID { get; set; }
-        public string Name { get; set; }
-        public string Phone { get; set; }
-        public string Email { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
     }
 
     public class NurseBasicInfo
     {
         public int NURSE_ID { get; set; }
-        public string Name { get; set; }
-        public string Phone { get; set; }
-        public string Email { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
     }
 }

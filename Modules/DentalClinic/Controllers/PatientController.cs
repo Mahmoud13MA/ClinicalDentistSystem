@@ -10,55 +10,42 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("[controller]")]
-    public class PatientController : Controller
+    [Route("api/v1/clinic/[controller]")]
+    public class PatientController(AppDbContext context, IPatientMappingService mappingService, IProfileManagementService profileManagement) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IPatientMappingService _mappingService;
-        private readonly IProfileManagementService _profileManagement;
-
-        public PatientController(AppDbContext context, IPatientMappingService mappingService, IProfileManagementService profileManagement)
-        {
-            _context = context;
-            _mappingService = mappingService;
-            _profileManagement = profileManagement;
-        }
 
         [HttpGet]
         [Route("")]
-        public async Task<IActionResult> GetPatient()
+        public async Task<IActionResult> GetPatients()
         {
-            var patients = await _context.Patients.ToListAsync();
-            if (patients == null || patients.Count == 0)
+            var patients = await context.Patients.ToListAsync();
+
+            if (patients.Count == 0)
             {
-                return NotFound();
+                return NotFound(new { message = "No patients found." });
             }
 
-            var response = _mappingService.MapToResponseList(patients);
+            var response = mappingService.MapToResponseList(patients);
             return Ok(response);
         }
 
-        [HttpGet("{Patient_ID}")]
-        public async Task<IActionResult> GetPatientById(int Patient_ID)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetPatientById(int id)
         {
-            var patient = await _context.Patients.FirstOrDefaultAsync(p => p.Patient_ID == Patient_ID);
+            var patient = await context.Patients.FirstOrDefaultAsync(p => p.Patient_ID == id);
+
             if (patient == null)
             {
-                return NotFound();
+                return NotFound(new { error = "Patient not found.", patient_ID = id });
             }
 
-            var response = _mappingService.MapToResponse(patient);
+            var response = mappingService.MapToResponse(patient);
             return Ok(response);
         }
 
         [HttpPost]
         public async Task<IActionResult> CreatePatient([FromBody] PatientCreateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Patient data is required.", hint = "Make sure you're sending a valid JSON body with patient information." });
-            }
-
             var patient = new Patient
             {
                 First = request.First,
@@ -69,35 +56,30 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 Phone = request.Phone
             };
 
-            _context.Patients.Add(patient);
-            await _context.SaveChangesAsync();
+            context.Patients.Add(patient);
+            await context.SaveChangesAsync();
 
-            var response = _mappingService.MapToResponse(patient);
-            return CreatedAtAction(nameof(GetPatientById), new { Patient_ID = patient.Patient_ID }, response);
+            var response = mappingService.MapToResponse(patient);
+            return CreatedAtAction(nameof(GetPatientById), new { id = patient.Patient_ID }, response);
         }
 
-        [HttpPut("{Patient_ID}")]
-        public async Task<IActionResult> UpdatePatient(int Patient_ID, [FromBody] UpdatePatientInfoRequest request)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdatePatient(int id, [FromBody] UpdatePatientInfoRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Patient data is required." });
-            }
-
-            var result = await _profileManagement.UpdatePatientInfoAsync(Patient_ID, request);
+            var result = await profileManagement.UpdatePatientInfoAsync(id, request);
 
             if (!result.IsSuccess)
             {
                 if (result.ErrorMessage == "Patient not found")
-                    return NotFound(new { error = result.ErrorMessage, patient_ID = Patient_ID });
+                    return NotFound(new { error = result.ErrorMessage, patient_ID = id });
 
                 return BadRequest(new { error = result.ErrorMessage });
             }
 
-            var updatedPatient = await _context.Patients.FindAsync(Patient_ID);
-            var response = _mappingService.MapToResponse(updatedPatient);
+            var updatedPatient = await context.Patients.FindAsync(id);
+            var response = mappingService.MapToResponse(updatedPatient);
 
             return Ok(new { message = "Patient updated successfully.", patient = response });
         }
     }
-}   
+}

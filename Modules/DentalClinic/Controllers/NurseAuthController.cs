@@ -9,39 +9,15 @@ using Microsoft.EntityFrameworkCore;
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
-    public class NurseAuthController : Controller
+    [Route("api/v1/clinic/[controller]")]
+    public class NurseAuthController(AppDbContext context, IJwtService jwtService, IPasswordHashService passwordHashService, IConfiguration configuration , IEmailValidationService emailValidationService)  : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IJwtService _jwtService;
-        private readonly IPasswordHashService _passwordHashService;
-        private readonly IConfiguration _configuration;
-        private readonly IEmailValidationService _emailValidationService;
-
-        public NurseAuthController(
-            AppDbContext context,
-            IJwtService jwtService,
-            IPasswordHashService passwordHashService,
-            IConfiguration configuration,
-            IEmailValidationService emailValidationService)
-        {
-            _context = context;
-            _jwtService = jwtService;
-            _passwordHashService = passwordHashService;
-            _configuration = configuration;
-            _emailValidationService = emailValidationService;
-        }
-
-        // POST: api/NurseAuth/Register
+       
         [HttpPost("Register")]
         public async Task<IActionResult> Register([FromBody] NurseRegisterRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Registration data is required." });
-            }
-
-            var validRegistrationKey = _configuration["RegistrationSettings:NurseRegistrationKey"];
+           
+            var validRegistrationKey = configuration["RegistrationSettings:NurseRegistrationKey"];
 
             if (string.IsNullOrEmpty(validRegistrationKey))
             {
@@ -53,7 +29,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return Unauthorized(new { error = "Invalid registration key. Contact your clinic administrator for the correct key." });
             }
 
-            var isEmailUsed = await _emailValidationService.IsEmailUsedAsync(request.Email);
+            var isEmailUsed = await emailValidationService.IsEmailUsedAsync(request.Email);
             if (isEmailUsed)
             {
                 return BadRequest(new { error = "Email already registered." });
@@ -64,13 +40,13 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 Name = request.Name,
                 Phone = request.Phone,
                 Email = request.Email.Trim().ToLowerInvariant(),
-                PasswordHash = _passwordHashService.HashPassword(request.Password)
+                PasswordHash = passwordHashService.HashPassword(request.Password)
             };
 
-            _context.Nurses.Add(nurse);
-            await _context.SaveChangesAsync();
+            context.Nurses.Add(nurse);
+            await context.SaveChangesAsync();
 
-            var token = _jwtService.GenerateToken(nurse.NURSE_ID, nurse.Email, nurse.Name, "Nurse");
+            var token = jwtService.GenerateToken(nurse.NURSE_ID, nurse.Email, nurse.Name, "Nurse");
 
             return Ok(new NurseLoginResponse
             {
@@ -82,23 +58,19 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             });
         }
 
-        // POST: api/NurseAuth/Login
         [HttpPost("Login")]
         public async Task<IActionResult> Login([FromBody] NurseLoginRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Login data is required." });
-            }
+           
 
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-            var nurse = await _context.Nurses.FirstOrDefaultAsync(n => n.Email == normalizedEmail);
-            if (nurse == null || !_passwordHashService.VerifyPassword(request.Password, nurse.PasswordHash))
+            var nurse = await context.Nurses.FirstOrDefaultAsync(n => n.Email == normalizedEmail);
+            if (nurse == null || !passwordHashService.VerifyPassword(request.Password, nurse.PasswordHash))
             {
                 return Unauthorized(new { error = "Invalid email or password." });
             }
 
-            var token = _jwtService.GenerateToken(nurse.NURSE_ID, nurse.Email, nurse.Name, "Nurse");
+            var token = jwtService.GenerateToken(nurse.NURSE_ID, nurse.Email, nurse.Name, "Nurse");
 
             return Ok(new NurseLoginResponse
             {

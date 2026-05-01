@@ -10,7 +10,7 @@ using clinical.APIs.Modules.DentalClinic.Services;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/v1/clinic/[controller]")]
     [ApiController]
     public class AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration, IEmailValidationService emailValidationService ,IProfileManagementService profileManagement) : ControllerBase
     {
@@ -176,8 +176,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPut("doctors/{id:int}/updateinfo")]
         public async Task<IActionResult> UpdateDoctorInfo(int id, [FromBody] UpdateStaffInfoRequest request)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var result = await profileManagement.UpdateDoctorInfoAsync(id, request);
             if (!result.IsSuccess)
             {
@@ -192,8 +190,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPut("nurses/{id:int}/updateinfo")]
         public async Task<IActionResult> UpdateNurseInfo(int id, [FromBody] UpdateStaffInfoRequest request)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var result = await profileManagement.UpdateNurseInfoAsync(id, request);
             if (!result.IsSuccess)
             {
@@ -208,8 +204,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPut("patients/{id:int}/updateinfo")]
         public async Task<IActionResult> UpdatePatientInfo(int id, [FromBody] UpdatePatientInfoRequest request)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var result = await profileManagement.UpdatePatientInfoAsync(id, request);
             if (!result.IsSuccess)
             {

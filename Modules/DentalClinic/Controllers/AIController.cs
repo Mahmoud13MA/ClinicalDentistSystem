@@ -7,7 +7,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v1/clinic/[controller]")]
     public class AIController : ControllerBase
     {
         private readonly ILlamaService _llamaService;

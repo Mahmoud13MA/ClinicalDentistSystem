@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using clinical.APIs.Modules.DentalClinic.Services;
@@ -12,20 +11,9 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("[controller]")]
-    public class EHRController : Controller
+    [Route("api/v1/clinic/[controller]")]
+    public class EHRController(AppDbContext context, IEHRMappingService mappingService, IEHRChangeLogService changeLogService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IEHRMappingService _mappingService;
-        private readonly IEHRChangeLogService _changeLogService;
-
-        public EHRController(AppDbContext context, IEHRMappingService mappingService, IEHRChangeLogService changeLogService)
-        {
-            _context = context;
-            _mappingService = mappingService;
-            _changeLogService = changeLogService;
-        }
-
         private (int DoctorId, string DoctorName) GetDoctorFromToken()
         {
             var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
@@ -43,7 +31,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [Route("")]
         public async Task<IActionResult> GetEHR()
         {
-            var ehrs = await _context.EHRs
+            var ehrs = await context.EHRs
                 .Include(e => e.Patient)
                 .Include(e => e.Appointment)
                 .Include(e => e.Medications)
@@ -53,19 +41,19 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 .Include(e => e.ChangeLogs)
                 .ToListAsync();
 
-            if (ehrs == null || ehrs.Count == 0)
+            if (ehrs.Count == 0)
             {
                 return NotFound();
             }
 
-            var response = _mappingService.MapToResponseList(ehrs);
+            var response = mappingService.MapToResponseList(ehrs);
             return Ok(response);
         }
 
         [HttpGet("{EHR_ID}")]
         public async Task<IActionResult> GetEHRById(int EHR_ID)
         {
-            var ehr = await _context.EHRs
+            var ehr = await context.EHRs
                 .Include(e => e.Patient)
                 .Include(e => e.Appointment)
                 .Include(e => e.Medications)
@@ -80,14 +68,14 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return NotFound();
             }
 
-            var response = _mappingService.MapToResponse(ehr);
+            var response = mappingService.MapToResponse(ehr);
             return Ok(response);
         }
 
         [HttpGet("patient/{Patient_ID}")]
         public async Task<IActionResult> GetEHRByPatientId(int Patient_ID)
         {
-            var ehrs = await _context.EHRs
+            var ehrs = await context.EHRs
                 .Include(e => e.Patient)
                 .Include(e => e.Appointment)
                 .Include(e => e.Medications)
@@ -98,25 +86,25 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 .Where(e => e.Patient_ID == Patient_ID)
                 .ToListAsync();
 
-            if (ehrs == null || ehrs.Count == 0)
+            if (ehrs.Count == 0)
             {
                 return NotFound();
             }
 
-            var response = _mappingService.MapToResponseList(ehrs);
+            var response = mappingService.MapToResponseList(ehrs);
             return Ok(response);
         }
 
         [HttpGet("{EHR_ID}/history")]
         public async Task<IActionResult> GetEHRChangeHistory(int EHR_ID)
         {
-            var ehr = await _context.EHRs.FindAsync(EHR_ID);
+            var ehr = await context.EHRs.FindAsync(EHR_ID);
             if (ehr == null)
             {
                 return NotFound(new { error = "EHR not found.", ehr_id = EHR_ID });
             }
 
-            var changeLogs = await _context.EHRChangeLogs
+            var changeLogs = await context.EHRChangeLogs
                 .Where(cl => cl.EHR_ID == EHR_ID)
                 .OrderByDescending(cl => cl.ChangedAt)
                 .Select(cl => new EHRChangeLogResponse
@@ -141,20 +129,15 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateEHR([FromBody] EHRCreateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "EHR data is required.", hint = "Make sure you're sending a valid JSON body with EHR information." });
-            }
-
             var (doctorId, doctorName) = GetDoctorFromToken();
 
-            var patient = await _context.Patients.FindAsync(request.Patient_ID);
+            var patient = await context.Patients.FindAsync(request.Patient_ID);
             if (patient == null)
             {
                 return BadRequest(new { error = "Patient not found.", patient_ID = request.Patient_ID });
             }
 
-            var appointment = await _context.Appointments.FindAsync(request.AppointmentId);
+            var appointment = await context.Appointments.FindAsync(request.AppointmentId);
             if (appointment == null)
             {
                 return BadRequest(new { error = "Appointment not found.", appointment_id = request.AppointmentId });
@@ -173,6 +156,8 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 Treatments = request.Treatments,
                 Patient_ID = request.Patient_ID,
                 AppointmentId = request.AppointmentId,
+                Patient = patient,
+                Appointment = appointment,
                 UpdatedBy = doctorName,
                 UpdatedAt = DateTime.Now,
                 Medications = request.Medications?.Select(m => new MedicationRecord
@@ -215,22 +200,13 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 }).ToList()
             };
 
-            _context.EHRs.Add(ehr);
-            await _context.SaveChangesAsync();
+            context.EHRs.Add(ehr);
+            await context.SaveChangesAsync();
 
-            await _changeLogService.LogCreationAsync(ehr, doctorId, doctorName, request.AppointmentId);
+            await changeLogService.LogCreationAsync(ehr, doctorId, doctorName, request.AppointmentId);
 
-            var createdEHR = await _context.EHRs
-                .Include(e => e.Patient)
-                .Include(e => e.Appointment)
-                .Include(e => e.Medications)
-                .Include(e => e.Procedures)
-                .Include(e => e.Teeth)
-                .Include(e => e.XRays)
-                .Include(e => e.ChangeLogs)
-                .FirstOrDefaultAsync(e => e.EHR_ID == ehr.EHR_ID);
-
-            var response = _mappingService.MapToResponse(createdEHR);
+            await context.Entry(ehr).Collection(e => e.ChangeLogs).LoadAsync();
+            var response = mappingService.MapToResponse(ehr);
             return CreatedAtAction(nameof(GetEHRById), new { EHR_ID = ehr.EHR_ID }, response);
         }
 
@@ -238,11 +214,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         [HttpPut("{EHR_ID}")]
         public async Task<IActionResult> UpdateEHR(int EHR_ID, [FromBody] EHRUpdateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "EHR data is required." });
-            }
-
             if (EHR_ID != request.EHR_ID)
             {
                 return BadRequest(new { error = "EHR ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
@@ -250,50 +221,53 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             var (doctorId, doctorName) = GetDoctorFromToken();
 
-            var existingEHR = await _context.EHRs.AsNoTracking().FirstOrDefaultAsync(e => e.EHR_ID == EHR_ID);
-            if (existingEHR == null)
-            {
-                return NotFound(new { error = "EHR not found.", ehr_id = EHR_ID });
-            }
-
-            if (existingEHR.Patient_ID != request.Patient_ID)
-            {
-                var patient = await _context.Patients.FindAsync(request.Patient_ID);
-                if (patient == null)
-                {
-                    return BadRequest(new { error = "Patient not found.", patient_ID = request.Patient_ID });
-                }
-            }
-
-            if (existingEHR.AppointmentId != request.AppointmentId)
-            {
-                var appointment = await _context.Appointments.FindAsync(request.AppointmentId);
-                if (appointment == null)
-                {
-                    return BadRequest(new { error = "Appointment not found.", appointment_id = request.AppointmentId });
-                }
-            }
-
-            var trackedEHR = await _context.EHRs
+            var trackedEHR = await context.EHRs
+                .Include(e => e.Patient)     
+                .Include(e => e.Appointment)  
                 .Include(e => e.Medications)
                 .Include(e => e.Procedures)
                 .Include(e => e.Teeth)
                 .Include(e => e.XRays)
-                .Include(e => e.ChangeLogs)
+                .Include(e => e.ChangeLogs)   
                 .FirstOrDefaultAsync(e => e.EHR_ID == EHR_ID);
+
+            if (trackedEHR == null)
+            {
+                return NotFound(new { error = "EHR not found.", ehr_id = EHR_ID });
+            }
+
+            if (trackedEHR.Patient_ID != request.Patient_ID)
+            {
+                var patient = await context.Patients.FindAsync(request.Patient_ID);
+                if (patient == null)
+                {
+                    return BadRequest(new { error = "Patient not found.", patient_ID = request.Patient_ID });
+                }
+                trackedEHR.Patient = patient; 
+            }
+
+            if (trackedEHR.AppointmentId != request.AppointmentId)
+            {
+                var appointment = await context.Appointments.FindAsync(request.AppointmentId);
+                if (appointment == null)
+                {
+                    return BadRequest(new { error = "Appointment not found.", appointment_id = request.AppointmentId });
+                }
+                trackedEHR.Appointment = appointment; 
+            }
 
             var oldEHR = new EHR
             {
-                EHR_ID = existingEHR.EHR_ID,
-                Allergies = existingEHR.Allergies,
-                MedicalAlerts = existingEHR.MedicalAlerts,
-                Diagnosis = existingEHR.Diagnosis,
-                XRayFindings = existingEHR.XRayFindings,
-                PeriodontalStatus = existingEHR.PeriodontalStatus,
-                ClinicalNotes = existingEHR.ClinicalNotes,
-                Recommendations = existingEHR.Recommendations,
-                History = existingEHR.History,
-                Treatments = existingEHR.Treatments
+                EHR_ID = trackedEHR.EHR_ID,
+                Allergies = trackedEHR.Allergies,
+                MedicalAlerts = trackedEHR.MedicalAlerts,
+                Diagnosis = trackedEHR.Diagnosis,
+                XRayFindings = trackedEHR.XRayFindings,
+                PeriodontalStatus = trackedEHR.PeriodontalStatus,
+                ClinicalNotes = trackedEHR.ClinicalNotes,
+                Recommendations = trackedEHR.Recommendations,
+                History = trackedEHR.History,
+                Treatments = trackedEHR.Treatments
             };
 
             var newEHR = new EHR
@@ -310,7 +284,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 Treatments = request.Treatments
             };
 
-            await _changeLogService.LogChangesAsync(oldEHR, newEHR, doctorId, doctorName, request.AppointmentId);
+            await changeLogService.LogChangesAsync(oldEHR, newEHR, doctorId, doctorName, request.AppointmentId);
 
             trackedEHR.Allergies = request.Allergies;
             trackedEHR.MedicalAlerts = request.MedicalAlerts;
@@ -326,14 +300,15 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             trackedEHR.UpdatedAt = DateTime.Now;
             trackedEHR.UpdatedBy = doctorName;
 
+            // Handle related collections
             if (trackedEHR.Medications != null)
-                _context.MedicationRecords.RemoveRange(trackedEHR.Medications);
+                context.MedicationRecords.RemoveRange(trackedEHR.Medications);
             if (trackedEHR.Procedures != null)
-                _context.ProcedureRecords.RemoveRange(trackedEHR.Procedures);
+                context.ProcedureRecords.RemoveRange(trackedEHR.Procedures);
             if (trackedEHR.Teeth != null)
-                _context.ToothRecords.RemoveRange(trackedEHR.Teeth);
+                context.ToothRecords.RemoveRange(trackedEHR.Teeth);
             if (trackedEHR.XRays != null)
-                _context.XRayRecords.RemoveRange(trackedEHR.XRays);
+                context.XRayRecords.RemoveRange(trackedEHR.XRays);
 
             if (request.Medications != null)
             {
@@ -393,21 +368,12 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 }).ToList();
             }
 
-            _context.EHRs.Update(trackedEHR);
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
-            var updatedEHR = await _context.EHRs
-                .Include(e => e.Patient)
-                .Include(e => e.Appointment)
-                .Include(e => e.Medications)
-                .Include(e => e.Procedures)
-                .Include(e => e.Teeth)
-                .Include(e => e.XRays)
-                .Include(e => e.ChangeLogs)
-                .FirstOrDefaultAsync(e => e.EHR_ID == EHR_ID);
-
-            var response = _mappingService.MapToResponse(updatedEHR);
+            await context.Entry(trackedEHR).Collection(e => e.ChangeLogs).LoadAsync();
+            var response = mappingService.MapToResponse(trackedEHR);
             return Ok(new { message = "EHR updated successfully.", ehr = response });
         }
     }
 }
+    
