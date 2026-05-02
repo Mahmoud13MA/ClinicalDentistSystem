@@ -1,3 +1,5 @@
+using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.Radiology.DTOs;
 using clinical.APIs.Shared.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -10,16 +12,14 @@ namespace clinical.APIs.Modules.Radiology.Controllers
     [Authorize]
     [ApiController]
     [Route("api/v1/radiology/[controller]")]
-    public class ImagingAppointmentController(AppDbContext context) : ControllerBase
+    public class ImagingAppointmentController(AppDbContext context , IMapper mapper) : ControllerBase
     {
      
         [HttpGet]
         public async Task<IActionResult> GetAllImagingAppointments()
         {
             var appointments = await context.ImagingAppointments
-                .Include(ia => ia.Patient)
-                .Include(ia => ia.Radiologist)
-                .Include(ia => ia.Equipment)
+                .ProjectTo<ImagingAppointmentResponse>(mapper.ConfigurationProvider)
                 .ToListAsync();
 
             if (appointments == null || appointments.Count == 0)
@@ -27,8 +27,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "No imaging appointments found." });
             }
 
-            var response = appointments.Select(ia => MapToResponse(ia)).ToList();
-            return Ok(response);
+            return Ok(appointments);
         }
 
         [HttpGet("{imagingId}")]
@@ -45,48 +44,44 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "Imaging appointment not found.", imaging_ID = imagingId });
             }
 
-            var response = MapToResponse(appointment);
+            var response = mapper.Map<ImagingAppointmentResponse>(appointment);
             return Ok(response);
         }
 
         [HttpGet("bypatient/{patientId}")]
         public async Task<IActionResult> GetImagingAppointmentsByPatient(int patientId)
         {
+
             var appointments = await context.ImagingAppointments
-                .Where(ia => ia.PatientID == patientId)
-                .Include(ia => ia.Patient)
-                .Include(ia => ia.Radiologist)
-                .Include(ia => ia.Equipment)
-                .ToListAsync();
+                    .Where(ia => ia.PatientID == patientId)
+                    .ProjectTo<ImagingAppointmentResponse>(mapper.ConfigurationProvider)
+                    .ToListAsync();
+
 
             if (appointments == null || appointments.Count == 0)
             {
                 return NotFound(new { error = "No imaging appointments found for this patient.", patient_ID = patientId });
             }
 
-            var response = appointments.Select(ia => MapToResponse(ia)).ToList();
-            return Ok(response);
+            return Ok(appointments);
         }
 
    
         [HttpGet("byradiologist/{radiologistId}")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetImagingAppointmentsByRadiologist(int radiologistId)
         {
             var appointments = await context.ImagingAppointments
                 .Where(ia => ia.RadiologistID == radiologistId)
-                .Include(ia => ia.Patient)
-                .Include(ia => ia.Radiologist)
-                .Include(ia => ia.Equipment)
+                .ProjectTo<ImagingAppointmentResponse>(mapper.ConfigurationProvider)
                 .ToListAsync();
+
 
             if (appointments == null || appointments.Count == 0)
             {
                 return NotFound(new { error = "No imaging appointments found for this radiologist.", radiologist_ID = radiologistId });
             }
 
-            var response = appointments.Select(ia => MapToResponse(ia)).ToList();
-            return Ok(response);
+            return Ok(appointments);
         }
 
         [HttpGet("byequipment/{equipmentId}")]
@@ -94,23 +89,20 @@ namespace clinical.APIs.Modules.Radiology.Controllers
         {
             var appointments = await context.ImagingAppointments
                 .Where(ia => ia.EquipmentID == equipmentId)
-                .Include(ia => ia.Patient)
-                .Include(ia => ia.Radiologist)
-                .Include(ia => ia.Equipment)
+                .ProjectTo<ImagingAppointmentResponse>(mapper.ConfigurationProvider)
                 .ToListAsync();
+
 
             if (appointments == null || appointments.Count == 0)
             {
                 return NotFound(new { error = "No imaging appointments found for this equipment.", equipment_ID = equipmentId });
             }
 
-            var response = appointments.Select(ia => MapToResponse(ia)).ToList();
-            return Ok(response);
+            return Ok(appointments);
         }
 
      
         [HttpPost]
-        [Authorize]
         public async Task<IActionResult> CreateImagingAppointment([FromBody] ImagingAppointmentCreateRequest request)
         {
 
@@ -132,31 +124,23 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return BadRequest(new { error = "Invalid Equipment ID.", equipment_ID = request.EquipmentID });
             }
 
-            var appointment = new ImagingAppointment
-            {
-                Datetime = request.Datetime,
-                Type = request.Type,
-                PatientID = request.PatientID,
-                RadiologistID = request.RadiologistID,
-                EquipmentID = request.EquipmentID,
+            var appointment = mapper.Map<ImagingAppointment>(request);
 
-                // for the mapping
 
-                Patient = patient ,
-                Radiologist = radiologist ,
-                Equipment = equipment 
-            };
+
+            appointment.Patient = patient;
+            appointment.Radiologist = radiologist;
+            appointment.Equipment = equipment; 
+           
 
             context.ImagingAppointments.Add(appointment);
             await context.SaveChangesAsync();
-
-            var response = MapToResponse(appointment);
+            var response = mapper.Map<ImagingAppointmentResponse>(appointment);
             return CreatedAtAction(nameof(GetImagingAppointmentById), new { imagingId = appointment.ImagingID }, response);
         }
 
       
         [HttpPut("{imagingId}")]
-        [Authorize]
         public async Task<IActionResult> UpdateImagingAppointment(int imagingId, [FromBody] ImagingAppointmentUpdateRequest request)
         {
           
@@ -193,53 +177,22 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             }
 
             // Update appointment properties
-            existingAppointment.Datetime = request.Datetime;
-            existingAppointment.Type = request.Type;
-            existingAppointment.PatientID = request.PatientID;
-            existingAppointment.RadiologistID = request.RadiologistID;
-            existingAppointment.EquipmentID = request.EquipmentID;
 
+            mapper.Map(request, existingAppointment);
+          
             existingAppointment.Patient = patient;
             existingAppointment.Equipment= equipment;
             existingAppointment.Radiologist= radiologist;
 
-            context.ImagingAppointments.Update(existingAppointment);
-            await context.SaveChangesAsync();
 
-            var response = MapToResponse(existingAppointment);
+
+            await context.SaveChangesAsync();
+            var response = mapper.Map<ImagingAppointmentResponse>(existingAppointment);
+
             return Ok(new { message = "Imaging appointment updated successfully.", imaging_appointment = response });
         }
 
        
-        private ImagingAppointmentResponse MapToResponse(ImagingAppointment appointment)
-        {
-            return new ImagingAppointmentResponse
-            {
-                ImagingID = appointment.ImagingID,
-                Datetime = appointment.Datetime,
-                Type = appointment.Type,
-                PatientID = appointment.PatientID,
-                Patient = appointment.Patient != null ? new PatientBasicInfoRadiology
-                {
-                    PatientID = appointment.Patient.PatientID
-                } : null,
-                RadiologistID = appointment.RadiologistID,
-                Radiologist = appointment.Radiologist != null ? new RadiologistBasicInfo
-                {
-                    RadiologistID = appointment.Radiologist.RadiologistID,
-                    Name = appointment.Radiologist.Name,
-                    Phone = appointment.Radiologist.Phone,
-                    Email = appointment.Radiologist.Email,
-                    Specialty = appointment.Radiologist.Specialty
-                } : null,
-                EquipmentID = appointment.EquipmentID,
-                Equipment = appointment.Equipment != null ? new EquipmentResponseBasicInfo
-                {
-                    EquipmentID = appointment.Equipment.EquipmentID,
-                    Type = appointment.Equipment.Type,
-                    Model = appointment.Equipment.Model
-                } : null
-            };
-        }
+     
     }
 }
