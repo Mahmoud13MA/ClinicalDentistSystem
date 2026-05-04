@@ -1,3 +1,5 @@
+using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.Radiology.DTOs;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Security;
@@ -12,7 +14,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
     [Authorize(Policy = "RadiologistOrAdmin")]
     [ApiController]
     [Route("api/v1/radiology/[controller]")]
-    public class RadiologistController(AppDbContext context , IPasswordHashService passwordHashService, IEmailValidationService emailValidationService) : ControllerBase
+    public class RadiologistController(AppDbContext context , IPasswordHashService passwordHashService, IEmailValidationService emailValidationService , IMapper mapper) : ControllerBase
     {
         [HttpGet]
         [Route("")]
@@ -24,14 +26,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "No radiologists found." });
             }
 
-            var response = radiologists.Select(r => new RadiologistResponse
-            {
-                RadiologistID = r.RadiologistID,
-                Name = r.Name,
-                Phone = r.Phone,
-                Email = r.Email,
-                Specialty = r.Specialty
-            }).ToList();
+            var response = mapper.Map<RadiologistResponse>(radiologists);
 
             return Ok(response);
         }
@@ -45,15 +40,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "Radiologist not found.", radiologist_ID = RadiologistID });
             }
 
-            var response = new RadiologistResponse
-            {
-                RadiologistID = radiologist.RadiologistID,
-                Name = radiologist.Name,
-                Phone = radiologist.Phone,
-                Email = radiologist.Email,
-                Specialty = radiologist.Specialty
-            };
-
+            var response = mapper.Map<RadiologistResponse>(radiologist);
             return Ok(response);
         }
 
@@ -68,26 +55,18 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return BadRequest(new { error = "Email already registered." });
             }
 
-            var radiologist = new Radiologist
-            {
-                Name = request.Name,
-                Phone = request.Phone,
-                Email = request.Email,
-                Specialty = request.Specialty,
-                PasswordHash = passwordHashService.HashPassword(request.Password)
-            };
+            var radiologist = mapper.Map<Radiologist>(request);
+            
 
             context.Radiologists.Add(radiologist);
             await context.SaveChangesAsync();
 
-            var response = new RadiologistResponse
-            {
-                RadiologistID = radiologist.RadiologistID,
-                Name = radiologist.Name,
-                Phone = radiologist.Phone,
-                Email = radiologist.Email,
-                Specialty = radiologist.Specialty
-            };
+            var response = mapper.Map<RadiologistResponse>(radiologist);
+
+            radiologist.PasswordHash = passwordHashService.HashPassword(request.Password);
+
+            radiologist.Email = request.Email.Trim().ToLowerInvariant();
+
 
             return CreatedAtAction(nameof(GetRadiologistById), new { RadiologistID = radiologist.RadiologistID }, response);
         }
@@ -95,42 +74,22 @@ namespace clinical.APIs.Modules.Radiology.Controllers
         [HttpPut("{RadiologistID}")]
         public async Task<IActionResult> UpdateRadiologist(int RadiologistID, [FromBody] RadiologistUpdateRequest request)
         {
-            
-
             if (RadiologistID != request.RadiologistID)
-            {
-                return BadRequest(new { error = "Radiologist ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
-            }
+                return BadRequest(new { error = "Radiologist ID mismatch." });
 
             var existingRadiologist = await context.Radiologists.FindAsync(RadiologistID);
             if (existingRadiologist == null)
-            {
                 return NotFound(new { error = "Radiologist not found.", radiologist_ID = RadiologistID });
-            }
 
-
-            var isEmailUsed = await emailValidationService.IsEmailUsedAsync(request.Email);
+            var isEmailUsed = await emailValidationService.IsEmailUsedAsync(request.Email, radiologistId:RadiologistID);
+         
             if (isEmailUsed)
-            {
-                return BadRequest(new { error = "Email already used ." });
-            }
+                return BadRequest(new { error = "Email already used by another radiologist." });
 
-            existingRadiologist.Name = request.Name;
-            existingRadiologist.Phone = request.Phone;
-            existingRadiologist.Email = request.Email;
-            existingRadiologist.Specialty = request.Specialty;
-
+            mapper.Map(request, existingRadiologist);
             await context.SaveChangesAsync();
 
-            var response = new RadiologistResponse
-            {
-                RadiologistID = existingRadiologist.RadiologistID,
-                Name = existingRadiologist.Name,
-                Phone = existingRadiologist.Phone,
-                Email = existingRadiologist.Email,
-                Specialty = existingRadiologist.Specialty
-            };
-
+            var response = mapper.Map<RadiologistResponse>(existingRadiologist);
             return Ok(new { message = "Radiologist updated successfully.", radiologist = response });
         }
 

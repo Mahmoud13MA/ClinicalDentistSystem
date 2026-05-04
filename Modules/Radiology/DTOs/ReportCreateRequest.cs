@@ -6,11 +6,11 @@ namespace clinical.APIs.Modules.Radiology.DTOs
     {
         [Required(ErrorMessage = "Findings are required")]
         [StringLength(500, ErrorMessage = "Findings cannot exceed 500 characters")]
-        public string Findings { get; set; }
+        public string Findings { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Diagnosis is required")]
         [StringLength(500, ErrorMessage = "Diagnosis cannot exceed 500 characters")]
-        public string Diagnosis { get; set; }
+        public string Diagnosis { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Imaging Appointment ID is required")]
         public int ImagingID { get; set; }

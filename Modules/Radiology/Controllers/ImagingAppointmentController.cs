@@ -22,7 +22,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 .ProjectTo<ImagingAppointmentResponse>(mapper.ConfigurationProvider)
                 .ToListAsync();
 
-            if (appointments == null || appointments.Count == 0)
+            if (!appointments.Any())
             {
                 return NotFound(new { error = "No imaging appointments found." });
             }
@@ -58,7 +58,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                     .ToListAsync();
 
 
-            if (appointments == null || appointments.Count == 0)
+            if (!appointments.Any())
             {
                 return NotFound(new { error = "No imaging appointments found for this patient.", patient_ID = patientId });
             }
@@ -76,7 +76,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 .ToListAsync();
 
 
-            if (appointments == null || appointments.Count == 0)
+            if (!appointments.Any())
             {
                 return NotFound(new { error = "No imaging appointments found for this radiologist.", radiologist_ID = radiologistId });
             }
@@ -93,7 +93,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 .ToListAsync();
 
 
-            if (appointments == null || appointments.Count == 0)
+            if (!appointments.Any())
             {
                 return NotFound(new { error = "No imaging appointments found for this equipment.", equipment_ID = equipmentId });
             }
@@ -127,7 +127,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             var appointment = mapper.Map<ImagingAppointment>(request);
 
 
-
+            // for the response mapper
             appointment.Patient = patient;
             appointment.Radiologist = radiologist;
             appointment.Equipment = equipment; 
@@ -179,7 +179,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             // Update appointment properties
 
             mapper.Map(request, existingAppointment);
-          
+            // for the response mapper
             existingAppointment.Patient = patient;
             existingAppointment.Equipment= equipment;
             existingAppointment.Radiologist= radiologist;
@@ -191,8 +191,5 @@ namespace clinical.APIs.Modules.Radiology.Controllers
 
             return Ok(new { message = "Imaging appointment updated successfully.", imaging_appointment = response });
         }
-
-       
-     
     }
 }

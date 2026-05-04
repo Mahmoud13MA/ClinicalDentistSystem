@@ -6,11 +6,11 @@ namespace clinical.APIs.Modules.Radiology.DTOs
     {
         [Required(ErrorMessage = "Equipment type is required")]
         [StringLength(100, ErrorMessage = "Type cannot exceed 100 characters")]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Model is required")]
         [StringLength(100, ErrorMessage = "Model cannot exceed 100 characters")]
-        public string Model { get; set; }
+        public string Model { get; set; } = string.Empty;
 
     }
 }

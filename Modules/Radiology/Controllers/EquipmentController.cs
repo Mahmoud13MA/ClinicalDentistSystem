@@ -1,3 +1,5 @@
+using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.Radiology.DTOs;
 using clinical.APIs.Shared.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -10,26 +12,22 @@ namespace clinical.APIs.Modules.Radiology.Controllers
     [Authorize]
     [ApiController]
     [Route("api/v1/radiology/[controller]")]
-    public class EquipmentController(AppDbContext context) : ControllerBase
+    public class EquipmentController(AppDbContext context , IMapper mapper) : ControllerBase
     {
        
         [HttpGet]
         public async Task<IActionResult> GetAllEquipment()
         {
-            var equipment = await context.Equipment.ToListAsync();
-            if (equipment == null || equipment.Count == 0)
+            var equipment = await context.Equipment.ProjectTo<EquipmentResponse>(mapper.ConfigurationProvider)
+                .ToListAsync();
+
+            if (!equipment.Any())
             {
                 return NotFound(new { error = "No equipment found." });
             }
 
-            var response = equipment.Select(e => new EquipmentResponse
-            {
-                EquipmentID = e.EquipmentID,
-                Type = e.Type,
-                Model = e.Model
-            }).ToList();
 
-            return Ok(response);
+            return Ok(equipment);
         }
 
         
@@ -45,50 +43,25 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "Equipment not found.", equipment_ID = equipmentId });
             }
 
-            var response = new EquipmentResponse
-            {
-                EquipmentID = equipment.EquipmentID,
-                Type = equipment.Type,
-                Model = equipment.Model,
-                ImagingAppointments = equipment.ImagingAppointments?
-                    .Select(ia => new ImagingAppointmentBasicInfo
-                    {
-                        ImagingID = ia.ImagingID,
-                        Datetime = ia.Datetime,
-                        Type = ia.Type
-                    }).ToList()
-            };
-
+            var response = mapper.Map<EquipmentResponse>(equipment); 
             return Ok(response);
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateEquipment([FromBody] EquipmentCreateRequest request)
         {
-           
 
-            var equipment = new Equipment
-            {
-                Type = request.Type,
-                Model = request.Model
-            };
 
+            var equipment = mapper.Map<Equipment>(request);
             context.Equipment.Add(equipment);
             await context.SaveChangesAsync();
 
-            var response = new EquipmentResponse
-            {
-                EquipmentID = equipment.EquipmentID,
-                Type = equipment.Type,
-                Model = equipment.Model
-            };
-
+            var response = mapper.Map<EquipmentResponse>(equipment);
             return CreatedAtAction(nameof(GetEquipmentById), new { equipmentId = equipment.EquipmentID }, response);
         }
 
        
         [HttpPut("{equipmentId}")]
-        [Authorize]
         public async Task<IActionResult> UpdateEquipment(int equipmentId, [FromBody] EquipmentUpdateRequest request)
         {
          
@@ -103,24 +76,18 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "Equipment not found.", equipment_ID = equipmentId });
             }
 
-            existingEquipment.Type = request.Type;
-            existingEquipment.Model = request.Model;
-
+         
+            mapper.Map(request, existingEquipment);
             await context.SaveChangesAsync();
 
-            var response = new EquipmentResponse
-            {
-                EquipmentID = existingEquipment.EquipmentID,
-                Type = existingEquipment.Type,
-                Model = existingEquipment.Model
-            };
 
+            var response = mapper.Map<EquipmentBasicInfo>(existingEquipment);
+            
             return Ok(new { message = "Equipment updated successfully.", equipment = response });
         }
 
      
         [HttpDelete("{equipmentId}")]
-        [Authorize]
         public async Task<IActionResult> DeleteEquipment(int equipmentId)
         {
             var equipment = await context.Equipment.FindAsync(equipmentId);

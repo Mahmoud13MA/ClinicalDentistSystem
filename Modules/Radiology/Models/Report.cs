@@ -10,17 +10,17 @@ namespace Radiology.Models
 
         [Required]
         [StringLength(500)]
-        public string Findings { get; set; }
+        public string Findings { get; set; } = string.Empty;
 
         [Required]
         [StringLength(500)]
-        public string Diagnosis { get; set; }
+        public string Diagnosis { get; set; } = string.Empty;
 
-        
+
 
         [ForeignKey("ImagingAppointment")]
         public int ImagingID { get; set; }
-        public ImagingAppointment ImagingAppointment { get; set; }
+        public ImagingAppointment ?ImagingAppointment { get; set; }
 
         [ForeignKey("Patient")]
         public int PatientID { get; set; }
@@ -28,6 +28,6 @@ namespace Radiology.Models
 
         [ForeignKey("Radiologist")]
         public int RadiologistID { get; set; }
-        public Radiologist Radiologist { get; set; }
+        public Radiologist? Radiologist { get; set; }
     }
 }
