@@ -12,7 +12,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Route("api/v1/clinic/[controller]")]
     [ApiController]
-    public class AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration, IEmailValidationService emailValidationService ,IProfileManagementService profileManagement) : ControllerBase
+    public class AdminController(AppDbContext context, IPasswordHashService passwordHashService, IJwtService jwtService, IConfiguration configuration, IEmailValidationService emailValidationService ,IProfileManagementService profileManagement , IDoctorMappingService mappingService , INurseMappingService nurseMapping ) : ControllerBase
     {
 
 
@@ -76,6 +76,41 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
 
 
+        [Authorize(Policy = "Admin")]
+        [HttpPost("CreateDoctor")]
+
+
+        public async Task<IActionResult>CreateDoctor([FromBody] DoctorCreateRequest request)
+
+        {
+           
+            var emailExits = await emailValidationService.IsEmailUsedAsync(request.Email);
+            if (emailExits)
+            {
+                return BadRequest(new { error = "Email already registered." });
+
+            }
+
+            var doctor = new Doctor
+            {
+                Name = request.Name,
+                Phone = request.Phone,
+                Email = request.Email.Trim().ToLowerInvariant(),
+                PasswordHash = passwordHashService.HashPassword(request.Password)
+            };
+
+
+            context.Doctors.Add(doctor);
+            await context.SaveChangesAsync();
+
+            var response = mappingService.MapToResponse(doctor);
+            return Ok(response);
+
+
+
+
+        }
+
         [Authorize(Policy ="Admin")]
         [HttpPut("doctors/{id:int}/credentials")]
 
@@ -103,6 +138,37 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             return Ok(new { message = "Doctor Credentials Updated " });
 
             }
+
+
+
+
+        [Authorize(Policy = "Admin")]
+        [HttpPost("CreateNurse")]
+        public async Task<IActionResult> CreateNurse([FromBody] NurseCreateRequest request) {
+
+
+            var emailExists =await emailValidationService.IsEmailUsedAsync(request.Email);
+            if (emailExists)
+            {
+                return BadRequest(new { error = "Email already registered." });
+
+            }
+
+            var nurse = new Nurse
+            {
+                Name = request.Name,
+                Phone = request.Phone,
+                Email = request.Email.Trim().ToLowerInvariant(),
+                PasswordHash = passwordHashService.HashPassword(request.Password)
+            };
+
+            context.Nurses.Add(nurse);
+            await context.SaveChangesAsync();
+
+            var response =nurseMapping.MapToResponse(nurse);
+
+            return Ok(response);
+        }
 
 
         [Authorize(Policy = "Admin")]
@@ -232,20 +298,4 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
 }
-
-
-
-

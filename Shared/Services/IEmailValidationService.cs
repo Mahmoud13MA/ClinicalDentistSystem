@@ -2,6 +2,6 @@
 {
     public interface IEmailValidationService
     {
-        Task<bool> IsEmailUsedAsync(string email, int? doctorId = null, int? nurseId = null, int? adminId = null);
+        Task<bool> IsEmailUsedAsync(string email, int? doctorId = null, int? nurseId = null, int? adminId = null, int? radiologistId = null);
     }
 }

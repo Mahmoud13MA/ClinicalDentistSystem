@@ -11,7 +11,6 @@ namespace clinical.APIs.Shared.Services
         IServiceProvider serviceProvider,
         ILogger<BackgroundSyncService> logger) : BackgroundService
     {
-        private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
         private readonly int _maxRetryAttempts = 5;
         private readonly TimeSpan _syncInterval = TimeSpan.FromSeconds(30);
 
@@ -65,7 +64,9 @@ namespace clinical.APIs.Shared.Services
             // Or use mediatr, but HTTP is fine if we saved route and payload.
 
             // For this example we just dispatch HTTP back to localhost.
-            var baseUrl = configuration["ApiBaseUrl"] ?? "https://localhost:7044"; 
+            var baseUrl = configuration["ApiBaseUrl"] 
+                ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Split(';').FirstOrDefault()
+                ?? "https://localhost:7044";
             var client = httpClientFactory.CreateClient("LocalSyncClient");
             client.BaseAddress = new Uri(baseUrl);
 
