@@ -11,7 +11,7 @@ namespace clinical.APIs.Modules.Radiology.DTOs
         public DateTime Datetime { get; set; }
         
         [Required(ErrorMessage = "Type is required")]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
         
         [Required(ErrorMessage = "Patient ID is required")]
         public int PatientID { get; set; }

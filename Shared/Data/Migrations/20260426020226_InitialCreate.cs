@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace clinical.APIs.Shared.Data.Migrations
+namespace clinical.APIs.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -43,6 +43,21 @@ namespace clinical.APIs.Shared.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Equipment",
+                columns: table => new
+                {
+                    EquipmentID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Type = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Model = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    ServiceDate = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Equipment", x => x.EquipmentID);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Nurses",
                 columns: table => new
                 {
@@ -74,6 +89,49 @@ namespace clinical.APIs.Shared.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Patients", x => x.Patient_ID);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ProcessedRequests",
+                columns: table => new
+                {
+                    IdempotencyKey = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    HttpMethod = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    Route = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProcessedRequests", x => x.IdempotencyKey);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Radiologists",
+                columns: table => new
+                {
+                    RadiologistID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Specialty = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Radiologists", x => x.RadiologistID);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RadiologyPatients",
+                columns: table => new
+                {
+                    PatientID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RadiologyPatients", x => x.PatientID);
                 });
 
             migrationBuilder.CreateTable(
@@ -128,6 +186,41 @@ namespace clinical.APIs.Shared.Data.Migrations
                         principalTable: "Patients",
                         principalColumn: "Patient_ID",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ImagingAppointments",
+                columns: table => new
+                {
+                    ImagingID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Datetime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Type = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PatientID = table.Column<int>(type: "int", nullable: false),
+                    RadiologistID = table.Column<int>(type: "int", nullable: false),
+                    EquipmentID = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ImagingAppointments", x => x.ImagingID);
+                    table.ForeignKey(
+                        name: "FK_ImagingAppointments_Equipment_EquipmentID",
+                        column: x => x.EquipmentID,
+                        principalTable: "Equipment",
+                        principalColumn: "EquipmentID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ImagingAppointments_Radiologists_RadiologistID",
+                        column: x => x.RadiologistID,
+                        principalTable: "Radiologists",
+                        principalColumn: "RadiologistID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ImagingAppointments_RadiologyPatients_PatientID",
+                        column: x => x.PatientID,
+                        principalTable: "RadiologyPatients",
+                        principalColumn: "PatientID",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -194,6 +287,41 @@ namespace clinical.APIs.Shared.Data.Migrations
                         principalTable: "Patients",
                         principalColumn: "Patient_ID",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Reports",
+                columns: table => new
+                {
+                    ReportID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Findings = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Diagnosis = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    ImagingID = table.Column<int>(type: "int", nullable: false),
+                    PatientID = table.Column<int>(type: "int", nullable: false),
+                    RadiologistID = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Reports", x => x.ReportID);
+                    table.ForeignKey(
+                        name: "FK_Reports_ImagingAppointments_ImagingID",
+                        column: x => x.ImagingID,
+                        principalTable: "ImagingAppointments",
+                        principalColumn: "ImagingID",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Reports_Radiologists_RadiologistID",
+                        column: x => x.RadiologistID,
+                        principalTable: "Radiologists",
+                        principalColumn: "RadiologistID",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Reports_RadiologyPatients_PatientID",
+                        column: x => x.PatientID,
+                        principalTable: "RadiologyPatients",
+                        principalColumn: "PatientID",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -380,6 +508,21 @@ namespace clinical.APIs.Shared.Data.Migrations
                 column: "Patient_ID");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ImagingAppointments_EquipmentID",
+                table: "ImagingAppointments",
+                column: "EquipmentID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImagingAppointments_PatientID",
+                table: "ImagingAppointments",
+                column: "PatientID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ImagingAppointments_RadiologistID",
+                table: "ImagingAppointments",
+                column: "RadiologistID");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_MedicationRecords_EHR_ID",
                 table: "MedicationRecords",
                 column: "EHR_ID");
@@ -388,6 +531,21 @@ namespace clinical.APIs.Shared.Data.Migrations
                 name: "IX_ProcedureRecords_EHR_ID",
                 table: "ProcedureRecords",
                 column: "EHR_ID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_ImagingID",
+                table: "Reports",
+                column: "ImagingID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_PatientID",
+                table: "Reports",
+                column: "PatientID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_RadiologistID",
+                table: "Reports",
+                column: "RadiologistID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_StockTransactions_Doctor_ID",
@@ -426,6 +584,12 @@ namespace clinical.APIs.Shared.Data.Migrations
                 name: "ProcedureRecords");
 
             migrationBuilder.DropTable(
+                name: "ProcessedRequests");
+
+            migrationBuilder.DropTable(
+                name: "Reports");
+
+            migrationBuilder.DropTable(
                 name: "StockTransactions");
 
             migrationBuilder.DropTable(
@@ -435,10 +599,22 @@ namespace clinical.APIs.Shared.Data.Migrations
                 name: "XRayRecords");
 
             migrationBuilder.DropTable(
+                name: "ImagingAppointments");
+
+            migrationBuilder.DropTable(
                 name: "Supplies");
 
             migrationBuilder.DropTable(
                 name: "EHRs");
+
+            migrationBuilder.DropTable(
+                name: "Equipment");
+
+            migrationBuilder.DropTable(
+                name: "Radiologists");
+
+            migrationBuilder.DropTable(
+                name: "RadiologyPatients");
 
             migrationBuilder.DropTable(
                 name: "Appointments");

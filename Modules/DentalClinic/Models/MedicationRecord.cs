@@ -9,7 +9,7 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public int Medication_ID { get; set; }
 
         [Required]
-        public string Name { get; set; }               // Medication name
+        public string Name { get; set; } = string.Empty;             // Medication name
         
         public string? Dosage { get; set; }            // e.g., "500mg"
         public string? Frequency { get; set; }         // e.g., "Twice daily"

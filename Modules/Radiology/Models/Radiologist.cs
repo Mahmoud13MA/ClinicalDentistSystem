@@ -9,7 +9,7 @@ namespace Radiology.Models
 
         [Required]
         [StringLength(100)]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [Required]
         [StringLength(20)]
@@ -17,14 +17,14 @@ namespace Radiology.Models
 
         [Required]
         [StringLength(100)]
-        public string Specialty { get; set; }
+        public string Specialty { get; set; } = string.Empty;
 
         [Required]
         [EmailAddress]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
         [Required]
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
         public ICollection<ImagingAppointment> ImagingAppointments { get; set; } = new List<ImagingAppointment>();
 

@@ -1,7 +1,6 @@
 using clinical.APIs.Modules.DentalClinic.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Modules.DentalClinic.DTOs;
@@ -9,22 +8,14 @@ using clinical.APIs.Modules.DentalClinic.Services;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
-    [Authorize(Policy = "DoctorOnly")]
+    [Authorize(Roles = "Admin,Doctor")]
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/v1/clinic/[controller]")]
     public class StockTransactionController(AppDbContext context, IStockTransactionMappingService mappingService) : ControllerBase
     {
         private IQueryable<Stock_Transaction> StockTransactionsWithDetails => context.StockTransactions
             .Include(st => st.Doctor)
             .Include(st => st.Supply);
-
-        private static List<string> GetValidationErrors(ModelStateDictionary modelState)
-        {
-            return modelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-        }
 
         private async Task<StockTransactionResponse?> GetTransactionResponseAsync(int transactionId)
         {
@@ -34,7 +25,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             return transaction == null ? null : mappingService.MapToResponse(transaction);
         }
 
-        // GET: /StockTransaction
         [HttpGet]
         [Route("")]
         public async Task<IActionResult> GetStockTransactions()
@@ -49,7 +39,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             return Ok(mappingService.MapToResponseList(transactions));
         }
 
-        // GET: /StockTransaction/{id}
         [HttpGet("{T_ID}")]
         public async Task<IActionResult> GetStockTransactionById(int T_ID)
         {
@@ -79,7 +68,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             return Ok(mappingService.MapToResponseList(transactions));
         }
 
-        // GET: /StockTransaction/Supply/{id}
         [HttpGet("Supply/{Supply_ID}")]
         public async Task<IActionResult> GetStockTransactionsBySupply(int Supply_ID)
         {
@@ -95,25 +83,9 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             return Ok(mappingService.MapToResponseList(transactions));
         }
 
-        // POST: /StockTransaction
         [HttpPost]
         public async Task<IActionResult> CreateStockTransaction([FromBody] StockTransactionCreateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Stock transaction data is required.", hint = "Make sure you're sending a valid JSON body with transaction information." });
-            }
-
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = GetValidationErrors(ModelState),
-                    hint = "Required fields: Date (format: YYYY-MM-DD), Time (format: HH:mm:ss), Quantity, Doctor_ID, Supply_ID"
-                });
-            }
-
             var doctorExists = await context.Doctors.AnyAsync(d => d.ID == request.Doctor_ID);
             if (!doctorExists)
             {
@@ -148,38 +120,24 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             };
 
             context.StockTransactions.Add(transaction);
+
             await context.SaveChangesAsync();
 
             var response = await GetTransactionResponseAsync(transaction.T_ID);
             if (response == null)
             {
-                return StatusCode(500, new { error = "Internal server error", message = "Created stock transaction could not be loaded." });
+                return NotFound(new { error = "Stock transaction not found after creation." });
             }
 
             return CreatedAtAction(nameof(GetStockTransactionById), new { T_ID = transaction.T_ID }, response);
         }
 
-        // PUT: /StockTransaction/{id}
         [HttpPut("{T_ID}")]
         public async Task<IActionResult> UpdateStockTransaction(int T_ID, [FromBody] StockTransactionUpdateRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Stock transaction data is required." });
-            }
-
             if (T_ID != request.T_ID)
             {
                 return BadRequest(new { error = "Transaction ID mismatch.", hint = "The ID in the URL must match the ID in the request body." });
-            }
-
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(new
-                {
-                    error = "Validation failed",
-                    details = GetValidationErrors(ModelState)
-                });
             }
 
             var existingTransaction = await context.StockTransactions.FindAsync(T_ID);
@@ -208,25 +166,27 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                     return BadRequest(new { error = "Original supply not found.", supply_ID = existingTransaction.Supply_ID });
                 }
 
-                oldSupply.Quantity += existingTransaction.Quantity;
-
                 var newSupply = await context.Supplies.FindAsync(request.Supply_ID);
                 if (newSupply == null)
                 {
                     return BadRequest(new { error = "Target supply not found.", supply_ID = request.Supply_ID });
                 }
 
-                if (newSupply.Quantity < request.Quantity)
+                int effectiveAvailable = (oldSupply.Supply_ID == newSupply.Supply_ID) 
+                    ? newSupply.Quantity + existingTransaction.Quantity 
+                    : newSupply.Quantity;
+
+                if (effectiveAvailable < request.Quantity)
                 {
-                    oldSupply.Quantity -= existingTransaction.Quantity;
                     return BadRequest(new
                     {
                         error = "Insufficient supply quantity.",
-                        available = newSupply.Quantity,
+                        available = effectiveAvailable,
                         requested = request.Quantity
                     });
                 }
 
+                oldSupply.Quantity += existingTransaction.Quantity;
                 newSupply.Quantity -= request.Quantity;
             }
 
@@ -238,13 +198,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             await context.SaveChangesAsync();
 
-            var response = await GetTransactionResponseAsync(T_ID);
-            if (response == null)
-            {
-                return StatusCode(500, new { error = "Internal server error", message = "Updated stock transaction could not be loaded." });
-            }
-
-            return Ok(new { message = "Stock transaction updated successfully.", transaction = response });
+            return Ok(new { message = "Stock transaction updated successfully."});
         }
 
         // DELETE: /StockTransaction/{id}
@@ -266,6 +220,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             supply.Quantity += transaction.Quantity;
 
             context.StockTransactions.Remove(transaction);
+
             await context.SaveChangesAsync();
 
             return Ok(new { message = "Stock transaction deleted successfully.", transaction_ID = T_ID });

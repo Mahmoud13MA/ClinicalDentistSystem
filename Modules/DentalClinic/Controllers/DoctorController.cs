@@ -1,97 +1,80 @@
-using clinical.APIs.Modules.DentalClinic.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using clinical.APIs.Shared.Data;
-using clinical.APIs.Shared.Security;
-using clinical.APIs.Shared.Services;
 using clinical.APIs.Modules.DentalClinic.DTOs;
 using clinical.APIs.Modules.DentalClinic.Services;
+using System.Security.Claims;
+
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
-    [Authorize(Policy = "DoctorOnly")]
+    [Authorize]
     [ApiController]
-    [Route("[controller]")]
-    public class DoctorController(AppDbContext context, IDoctorMappingService mappingService, IEmailValidationService emailValidationService, IProfileManagementService profileManagementService, IPasswordHashService passwordHashService) : ControllerBase
+    [Route("api/v1/clinic/[controller]")]
+    public class DoctorController(AppDbContext context, IDoctorMappingService mappingService, IProfileManagementService profileManagementService) : ControllerBase
     {
-
-
-        [HttpGet]
-        [Route("")]
-        public async Task<IActionResult> GetDoctor()
+        [Authorize(Policy = "DoctorOnly")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetDoctorById(int id)
         {
-            var doctors = await context.Doctors.ToListAsync();
-            if (doctors == null || doctors.Count == 0)
+            // Specifically looking for NameIdentifier (which maps to "sub") or directly looking for "sub"
+            var loggedInUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            
+            if (string.IsNullOrEmpty(loggedInUserIdString) || !int.TryParse(loggedInUserIdString, out int loggedInUserId) || loggedInUserId != id)
             {
-                return NotFound();
+                return Forbid();
             }
 
-            var response = mappingService.MapToResponseList(doctors);
-            return Ok(response);
-        }
-
-        [HttpGet("{ID}")]
-        public async Task<IActionResult> GetDoctorById(int ID)
-        {
-            var doctor = await context.Doctors.FirstOrDefaultAsync(d => d.ID == ID);
+            var doctor = await context.Doctors.FindAsync(id);
             if (doctor == null)
             {
-                return NotFound();
+                return NotFound(new { error = "Doctor profile not found." });
             }
 
             var response = mappingService.MapToResponse(doctor);
             return Ok(response);
         }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateDoctor([FromBody] DoctorCreateRequest request)
+        [Authorize(Policy = "DoctorOnly")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateDoctor(int id, [FromBody] UpdateStaffInfoRequest request)
         {
-            // Check if email already exists
-            var emailExists = await emailValidationService.IsEmailUsedAsync(request.Email);
-            if (emailExists)
+            var loggedInUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            
+            if (string.IsNullOrEmpty(loggedInUserIdString) || !int.TryParse(loggedInUserIdString, out int loggedInUserId) || loggedInUserId != id)
             {
-                return BadRequest(new { error = "Email already registered." });
+                return Forbid();
             }
 
-            var doctor = new Doctor
-            {
-                Name = request.Name,
-                Phone = request.Phone,
-                Email = request.Email.Trim().ToLowerInvariant(),
-                PasswordHash = passwordHashService.HashPassword(request.Password)
-            };
-
-            context.Doctors.Add(doctor);
-            await context.SaveChangesAsync();
-
-            var response = mappingService.MapToResponse(doctor);
-            return CreatedAtAction(nameof(GetDoctorById), new { ID = doctor.ID }, response);
-        }
-
-
-
-        [HttpPut("{ID}")]
-        public async Task<IActionResult> UpdateDoctor(int ID, [FromBody] UpdateStaffInfoRequest request)
-        {
-            var result = await profileManagementService.UpdateDoctorInfoAsync(ID, request);
+            var result = await profileManagementService.UpdateDoctorInfoAsync(id, request);
 
             if (!result.IsSuccess)
             {
                 if (result.ErrorMessage == "Doctor not found")
-                    return NotFound(new { error = result.ErrorMessage, doctor_ID = ID });
+                    return NotFound(new { error = result.ErrorMessage, doctor_ID = id });
 
                 return BadRequest(new { error = result.ErrorMessage });
             }
 
-            // Fetch updated doctor to return
-            var updatedDoctor = await context.Doctors.FindAsync(ID);
+            var updatedDoctor = await context.Doctors.FindAsync(id);
             var response = mappingService.MapToResponse(updatedDoctor);
 
             return Ok(new { message = "Doctor updated successfully.", doctor = response });
         }
 
+        [Authorize(Policy = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetDoctors()
+        {
+            var doctors = await context.Doctors.ToListAsync();
+            
+            if (doctors.Count == 0)
+            {
+                return NotFound(new { message = "No doctors found." });
+            }
 
-
-
+            var response = mappingService.MapToResponseList(doctors);
+            return Ok(response);
+        }
     }
 }

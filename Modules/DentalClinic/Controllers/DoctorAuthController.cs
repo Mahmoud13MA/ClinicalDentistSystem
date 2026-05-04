@@ -9,39 +9,17 @@ using clinical.APIs.Modules.DentalClinic.DTOs;
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
-    public class DoctorAuthController : Controller
+    [Route("api/v1/clinic/[controller]")]
+    public class DoctorAuthController(AppDbContext context, IJwtService jwtService , IPasswordHashService passwordHashService , IConfiguration configuration , IEmailValidationService emailValidationService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IJwtService _jwtService;
-        private readonly IPasswordHashService _passwordHashService;
-        private readonly IConfiguration _configuration;
-        private readonly IEmailValidationService _emailValidationService;
+      
 
-        public DoctorAuthController(
-            AppDbContext context,
-            IJwtService jwtService,
-            IPasswordHashService passwordHashService,
-            IConfiguration configuration,
-            IEmailValidationService emailValidationService)
-        {
-            _context = context;
-            _jwtService = jwtService;
-            _passwordHashService = passwordHashService;
-            _configuration = configuration;
-            _emailValidationService = emailValidationService;
-        }
-
-        // POST: api/DoctorAuth/Register
         [HttpPost("Register")]
         public async Task<IActionResult> Register([FromBody] DoctorRegisterRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { error = "Registration data is required." });
-            }
+           
 
-            var validRegistrationKey = _configuration["RegistrationSettings:DoctorRegistrationKey"];
+            var validRegistrationKey = configuration["RegistrationSettings:DoctorRegistrationKey"];
 
             if (string.IsNullOrEmpty(validRegistrationKey))
             {
@@ -53,7 +31,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 return Unauthorized(new { error = "Invalid registration key. Contact your clinic administrator for the correct key." });
             }
 
-            var isEmailUsed = await _emailValidationService.IsEmailUsedAsync(request.Email);
+            var isEmailUsed = await emailValidationService.IsEmailUsedAsync(request.Email);
             if (isEmailUsed)
             {
                 return BadRequest(new { error = "Email already registered." });
@@ -64,13 +42,13 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
                 Name = request.Name,
                 Phone = request.Phone,
                 Email = request.Email.Trim().ToLowerInvariant(),
-                PasswordHash = _passwordHashService.HashPassword(request.Password)
+                PasswordHash = passwordHashService.HashPassword(request.Password)
             };
 
-            _context.Doctors.Add(doctor);
-            await _context.SaveChangesAsync();
+            context.Doctors.Add(doctor);
+            await context.SaveChangesAsync();
 
-            var token = _jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
+            var token = jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
 
             return Ok(new DoctorLoginResponse
             {
@@ -82,7 +60,6 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             });
         }
 
-        // POST: api/DoctorAuth/Login
         [HttpPost("Login")]
         public async Task<IActionResult> Login([FromBody] DoctorLoginRequest request)
         {
@@ -92,13 +69,13 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
             }
 
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-            var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Email == normalizedEmail);
-            if (doctor == null || !_passwordHashService.VerifyPassword(request.Password, doctor.PasswordHash))
+            var doctor = await context.Doctors.FirstOrDefaultAsync(d => d.Email == normalizedEmail);
+            if (doctor == null || !passwordHashService.VerifyPassword(request.Password, doctor.PasswordHash))
             {
                 return Unauthorized(new { error = "Invalid email or password." });
             }
 
-            var token = _jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
+            var token = jwtService.GenerateToken(doctor.ID, doctor.Email, doctor.Name, "Doctor");
 
             return Ok(new DoctorLoginResponse
             {

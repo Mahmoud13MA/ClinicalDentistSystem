@@ -9,10 +9,10 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public int ChangeLog_ID { get; set; }
 
         // What changed
-        public string FieldName { get; set; }           // Name of the field that was changed
-        public string? OldValue { get; set; }           // Previous value
+        public string FieldName { get; set; } = string.Empty;        // Name of the field that was changed
+        public string? OldValue { get; set; } = string.Empty;          // Previous value
         public string? NewValue { get; set; }           // New value
-        public string ChangeType { get; set; }          // "Created", "Updated", "Deleted"
+        public string ChangeType { get; set; } = string.Empty;         // "Created", "Updated", "Deleted"
 
         // When it changed
         public DateTime ChangedAt { get; set; }
@@ -21,7 +21,7 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         [ForeignKey(nameof(Doctor))]
         public int ChangedByDoctorId { get; set; }
         public Doctor? Doctor { get; set; }
-        public string ChangedByDoctorName { get; set; }
+        public string ChangedByDoctorName { get; set; } = string.Empty; 
 
         // In which appointment
         [ForeignKey(nameof(Appointment))]

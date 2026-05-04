@@ -9,11 +9,11 @@ namespace Radiology.Models
 
         [Required]
         [StringLength(100)]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
 
         [Required]
         [StringLength(100)]
-        public string Model { get; set; }
+        public string Model { get; set; } = string.Empty;
 
         [Required]
         public DateTime ServiceDate { get; set; }

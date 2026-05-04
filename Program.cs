@@ -1,7 +1,11 @@
-﻿using clinical.APIs.Modules.DentalClinic.Services;
-using clinical.APIs.Modules.DentalClinic;
+﻿using clinical.APIs.Modules.DentalClinic;
+using clinical.APIs.Modules.DentalClinic.Services;
+using clinical.APIs.Modules.Radiology.MappingProfiles;
 using clinical.APIs.Shared.Data;
+using clinical.APIs.Shared.Filters;
+using clinical.APIs.Shared.Middleware;
 using clinical.APIs.Shared.Security;
+using clinical.APIs.Shared.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -39,7 +43,11 @@ static int FindAvailablePort(int startPort)
             socket.Bind(new IPEndPoint(IPAddress.Loopback, port));
             return port;
         }
-        catch (SocketException) { }
+        catch (SocketException)
+        {
+            // Port is unavailable; try the next one.
+            continue;
+        }
     }
     throw new InvalidOperationException($"No available ports found starting from {startPort}");
 }
@@ -55,13 +63,17 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlServer(connectionString, sqlOptions =>
         sqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null));
-    
+
     if (builder.Environment.IsDevelopment())
     {
         options.EnableSensitiveDataLogging();
         options.EnableDetailedErrors();
     }
 });
+
+// Configure SQLite Fallback Queue DB
+builder.Services.AddDbContext<LocalQueueDbContext>(opts => 
+    opts.UseSqlite("Data Source=local_fallback_queue.db"));
 
 builder.Services.AddCors(options =>
 {
@@ -76,6 +88,10 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
 builder.Services.AddScoped<clinical.APIs.Shared.Services.IEmailValidationService, clinical.APIs.Shared.Services.EmailValidationService>();
+builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
+builder.Services.AddHttpClient("LocalSyncClient");
+builder.Services.AddHostedService<clinical.APIs.Shared.Services.BackgroundSyncService>();
+builder.Services.AddAutoMapper(typeof(RadiologyMappingProfile));
 
 // Module services
 builder.Services.AddDentalClinicModule();
@@ -119,9 +135,15 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("NurseOnly", policy => policy.RequireRole("Nurse"));
     options.AddPolicy("DoctorOrNurse", policy => policy.RequireRole("Doctor", "Nurse"));
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("Radiologist", policy => policy.RequireRole("Radiologist"));
+    options.AddPolicy("RadiologistOrAdmin", policy => policy.RequireRole("Radiologist", "Admin"));
 });
 
-builder.Services.AddControllers();
+// Configure Global MVC Filters
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<IdempotencyFilter>();
+});
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -164,9 +186,18 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
+
+     // Apply migrations for Local Fallback DB as well, to keep schema management consistent
+    var queueContext = scope.ServiceProvider.GetRequiredService<LocalQueueDbContext>();
+    await queueContext.Database.MigrateAsync();
+
 }
 
 // Configure pipeline
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+app.UseMiddleware<DatabaseOutageMiddleware>(); 
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
