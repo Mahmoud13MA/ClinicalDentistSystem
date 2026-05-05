@@ -7,11 +7,28 @@ namespace clinical.APIs.Modules.DentalClinic.Models
     {
         [Key]
         public int PrescriptionID { get; set; }
+
+        [Required]
+        [MaxLength(50)]
         public string Status { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(50)]
         public string Shade { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
         public string Material { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
         public string ProductType { get; set; } = string.Empty;
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
         public decimal UnitPrice { get; set; }
+
+        [Required]
         public DateTime DueDate { get; set; }
 
         [ForeignKey("LabTechnician")]

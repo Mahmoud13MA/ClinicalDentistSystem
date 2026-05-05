@@ -7,8 +7,16 @@ namespace clinical.APIs.Modules.DentalClinic.Models
     {
         [Key]
         public int OrderID { get; set; }
+
+        [Required]
         public DateTime OrderDate { get; set; }
+
+        [Required]
+        [MaxLength(50)]
         public string ShippingMethod { get; set; } = string.Empty;
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
         public decimal TotalAmount { get; set; }
 
         [ForeignKey("LabTechnician")]

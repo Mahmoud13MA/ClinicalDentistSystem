@@ -30,6 +30,11 @@ namespace clinical.APIs.Shared.Data
         public DbSet<Radiology.Models.Equipment> Equipment { get; set; }
         public DbSet<Radiology.Models.Report> Reports { get; set; }
 
+        // Prosthodontic Lab DbSets
+        public DbSet<clinical.APIs.Modules.DentalClinic.Models.LabTechnician> LabTechnicians { get; set; }
+        public DbSet<clinical.APIs.Modules.DentalClinic.Models.Prescription> Prescriptions { get; set; }
+        public DbSet<clinical.APIs.Modules.DentalClinic.Models.Order> Orders { get; set; }
+
         public DbSet<clinical.APIs.Shared.Models.ProcessedRequest> ProcessedRequests { get; set; }
 
         public DbSet<Admin> Admins { get; set; }
@@ -143,6 +148,24 @@ namespace clinical.APIs.Shared.Data
                         .OnDelete(DeleteBehavior.Restrict);
 
 
+                    // Prosthodontic Lab Module Relationships
+                    modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Order>()
+                        .HasOne(o => o.LabTechnician)
+                        .WithMany(lt => lt.Orders)
+                        .HasForeignKey(o => o.LabTechnicianID)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Prescription>()
+                        .HasOne(p => p.LabTechnician)
+                        .WithMany(lt => lt.Prescriptions)
+                        .HasForeignKey(p => p.LabTechnicianID)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Prescription>()
+                        .HasOne(p => p.Order)
+                        .WithMany(o => o.Prescriptions)
+                        .HasForeignKey(p => p.OrderID)
+                        .OnDelete(DeleteBehavior.Cascade);
                 }
             }
         }
