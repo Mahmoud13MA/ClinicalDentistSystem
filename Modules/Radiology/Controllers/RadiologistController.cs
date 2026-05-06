@@ -26,7 +26,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 return NotFound(new { error = "No radiologists found." });
             }
 
-            var response = mapper.Map<RadiologistResponse>(radiologists);
+            var response = mapper.Map<IEnumerable<RadiologistResponse>>(radiologists);
 
             return Ok(response);
         }
@@ -56,17 +56,14 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             }
 
             var radiologist = mapper.Map<Radiologist>(request);
-            
+
+            radiologist.PasswordHash = passwordHashService.HashPassword(request.Password);
+            radiologist.Email = request.Email.Trim().ToLowerInvariant();
 
             context.Radiologists.Add(radiologist);
             await context.SaveChangesAsync();
 
             var response = mapper.Map<RadiologistResponse>(radiologist);
-
-            radiologist.PasswordHash = passwordHashService.HashPassword(request.Password);
-
-            radiologist.Email = request.Email.Trim().ToLowerInvariant();
-
 
             return CreatedAtAction(nameof(GetRadiologistById), new { RadiologistID = radiologist.RadiologistID }, response);
         }

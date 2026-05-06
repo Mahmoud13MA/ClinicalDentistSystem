@@ -91,7 +91,7 @@ builder.Services.AddScoped<clinical.APIs.Shared.Services.IEmailValidationService
 builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
 builder.Services.AddHttpClient("LocalSyncClient");
 builder.Services.AddHostedService<clinical.APIs.Shared.Services.BackgroundSyncService>();
-builder.Services.AddAutoMapper(typeof(RadiologyMappingProfile));
+builder.Services.AddAutoMapper(typeof(RadiologyMappingProfile), typeof(clinical.APIs.Modules.ProsthodonticLab.MappingProfiles.ProsthodonticLabMappingProfile));
 
 // Module services
 builder.Services.AddDentalClinicModule();
@@ -137,6 +137,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
     options.AddPolicy("Radiologist", policy => policy.RequireRole("Radiologist"));
     options.AddPolicy("RadiologistOrAdmin", policy => policy.RequireRole("Radiologist", "Admin"));
+    options.AddPolicy("LabTechnician", policy => policy.RequireRole("LabTechnician"));
 });
 
 // Configure Global MVC Filters
@@ -188,8 +189,8 @@ using (var scope = app.Services.CreateScope())
     await context.Database.MigrateAsync();
 
      // Apply migrations for Local Fallback DB as well, to keep schema management consistent
-    var queueContext = scope.ServiceProvider.GetRequiredService<LocalQueueDbContext>();
-    await queueContext.Database.MigrateAsync();
+     var queueContext = scope.ServiceProvider.GetRequiredService<LocalQueueDbContext>();
+     await queueContext.Database.EnsureCreatedAsync();
 
 }
 
