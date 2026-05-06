@@ -69,7 +69,7 @@ namespace clinical.APIs.Shared.Middleware
         }
 
         private static bool IsWriteOperation(string method)
-            => HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsDelete(method);
+            => HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsDelete(method) || HttpMethods.IsPatch(method);
 
         private async Task HandleConnectivityFailureAsync(
             HttpContext context,
@@ -111,6 +111,14 @@ namespace clinical.APIs.Shared.Middleware
         {
             try
             {
+                // Skip if this is already a replay from the background sync service
+                if (context.Request.Headers.ContainsKey("X-System-Sync") && 
+                    context.Request.Headers["X-System-Sync"] == "true")
+                {
+                    logger.LogInformation("Skipping queueing for replayed request from sync service.");
+                    return;
+                }
+
                 var payload = await ReadRequestPayloadAsync(context.Request, cancellationToken);
                 var idempotencyKey = context.Request.Headers["X-Idempotency-Key"].FirstOrDefault();
                 var route = context.Request.Path.Value ?? string.Empty;

@@ -19,8 +19,10 @@ public class IdempotencyFilter : IAsyncActionFilter
             return;
         }
 
-        // (Optional) Exclude login endpoint – remove this block if you want to enforce the key there too
-        if (request.Path.StartsWithSegments("/api/admin/login", StringComparison.OrdinalIgnoreCase))
+        // (Optional) Exclude login and auth endpoints – remove this block if you want to enforce the key there too
+        var path = request.Path.Value ?? string.Empty;
+        if (path.Contains("/login", StringComparison.OrdinalIgnoreCase) || 
+            path.Contains("auth", StringComparison.OrdinalIgnoreCase))
         {
             await next();
             return;
@@ -74,7 +76,12 @@ public class IdempotencyFilter : IAsyncActionFilter
         // 5. After successful execution (2xx), record the key
         if (executedContext.Exception == null && executedContext.Result != null)
         {
-            var statusCode = context.HttpContext.Response.StatusCode;
+            int statusCode = context.HttpContext.Response.StatusCode;
+            if (executedContext.Result is Microsoft.AspNetCore.Mvc.Infrastructure.IStatusCodeActionResult statusCodeResult && statusCodeResult.StatusCode.HasValue)
+            {
+                statusCode = statusCodeResult.StatusCode.Value;
+            }
+
             if (statusCode >= 200 && statusCode <= 299)   // Only on success
             {
                 try

@@ -94,9 +94,9 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
         public async Task<IActionResult> GetSuppliesByCategory(string category)
         {
             var supplies = await context.Supplies
-                .Where(s => s.Category == category)
                 .Include(s => s.StockTransactions)
                     .ThenInclude(st => st.Doctor)
+                .Where(s => string.Equals(s.Category, category, StringComparison.OrdinalIgnoreCase))
                 .AsSplitQuery()
                 .ToListAsync();
 
