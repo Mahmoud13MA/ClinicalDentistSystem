@@ -29,6 +29,12 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         [Phone]
         public string? Phone { get; set; }
 
+        [EmailAddress]
+        public string? Email { get; set; } 
+        public string? PasswordHash { get; set; }
+
+        public ICollection<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>? ConsentRequests { get; set; }
+
         
         public ICollection<Appointment>? Appointments { get; set; }
         public ICollection<EHR>? EHRs { get; set; }
