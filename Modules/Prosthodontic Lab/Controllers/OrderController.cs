@@ -65,10 +65,28 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
             mapper.Map(request, order);
 
             await context.SaveChangesAsync();
-            
+
             var response = mapper.Map<OrderResponse>(order);
 
             return Ok(new { message = "Order updated successfully.", order = response });
+        }
+
+        [HttpPatch("{id}/status")]
+        public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] OrderPatchStatusRequest request)
+        {
+            var order = await context.Orders.FindAsync(id);
+            if (order == null)
+            {
+                return NotFound(new { error = "Order not found.", orderID = id });
+            }
+
+            order.Status = request.Status;
+
+            await context.SaveChangesAsync();
+
+            var response = mapper.Map<OrderResponse>(order);
+
+            return Ok(new { message = "Order status updated successfully.", order = response });
         }
 
         [HttpDelete("{id}")]

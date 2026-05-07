@@ -8,6 +8,9 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         [Key]
         public int PrescriptionID { get; set; }
 
+        public int PatientId { get; set; }
+        public int DentistId { get; set; }
+
         [Required]
         [MaxLength(50)]
         public string Status { get; set; } = string.Empty;
@@ -24,9 +27,14 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         [MaxLength(100)]
         public string ProductType { get; set; } = string.Empty;
 
-        [Required]
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal UnitPrice { get; set; }
+        [MaxLength(100)]
+        public string CaseType { get; set; } = string.Empty;
+
+        [Range(11, 48)]
+        public int ToothNumber { get; set; }
+
+        [MaxLength(1000)]
+        public string Notes { get; set; } = string.Empty;
 
         [Required]
         public DateTime DueDate { get; set; }
