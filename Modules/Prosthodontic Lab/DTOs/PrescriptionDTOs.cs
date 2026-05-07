@@ -1,27 +1,8 @@
-using System;
-using System.Collections.Generic;
+
 using System.ComponentModel.DataAnnotations;
 
 namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
 {
-    public class ToothArrayRangeAttribute : ValidationAttribute
-    {
-        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
-        {
-            if (value is IEnumerable<int> teeth)
-            {
-                foreach (var tooth in teeth)
-                {
-                    if (tooth < 11 || tooth > 48)
-                    {
-                        return new ValidationResult($"Tooth number {tooth} is invalid. Must be between 11 and 48.");
-                    }
-                }
-            }
-            return ValidationResult.Success;
-        }
-    }
-
     public class PrescriptionCreateRequest
     {
         public int LabTechnicianID { get; set; }
@@ -34,8 +15,8 @@ namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
         public string ProductType { get; set; } = string.Empty;
         public string CaseType { get; set; } = string.Empty;
 
-        [ToothArrayRange]
-        public List<int> ToothNumbers { get; set; } = new List<int>();
+        [Range(11, 48, ErrorMessage = "Tooth number must be between 11 and 48.")]
+        public int ToothNumber { get; set; }
 
         public string Notes { get; set; } = string.Empty;
         public decimal UnitPrice { get; set; }
@@ -50,8 +31,8 @@ namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
         public string ProductType { get; set; } = string.Empty;
         public string CaseType { get; set; } = string.Empty;
 
-        [ToothArrayRange]
-        public List<int> ToothNumbers { get; set; } = new List<int>();
+        [Range(11, 48, ErrorMessage = "Tooth number must be between 11 and 48.")]
+        public int ToothNumber { get; set; }
 
         public string Notes { get; set; } = string.Empty;
         public decimal UnitPrice { get; set; }
@@ -75,7 +56,7 @@ namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
         public string Material { get; set; } = string.Empty;
         public string ProductType { get; set; } = string.Empty;
         public string CaseType { get; set; } = string.Empty;
-        public List<int> ToothNumbers { get; set; } = new List<int>();
+        public int ToothNumber { get; set; }
         public string Notes { get; set; } = string.Empty;
         public decimal UnitPrice { get; set; }
         public DateTime DueDate { get; set; }
