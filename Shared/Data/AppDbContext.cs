@@ -34,10 +34,14 @@ namespace clinical.APIs.Shared.Data
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.LabTechnician> LabTechnicians { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Prescription> Prescriptions { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Order> Orders { get; set; }
+        
+        // Patient Portal  DbSets
+        public DbSet<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest> ConsentRequests { get; set; }
 
         public DbSet<clinical.APIs.Shared.Models.ProcessedRequest> ProcessedRequests { get; set; }
 
         public DbSet<Admin> Admins { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -167,5 +171,15 @@ namespace clinical.APIs.Shared.Data
                         .HasForeignKey(p => p.OrderID)
                         .OnDelete(DeleteBehavior.Cascade);
                 }
-            }
+            modelBuilder.Entity<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>()
+                .HasOne(c => c.Patient)
+                .WithMany(p => p.ConsentRequests)
+                .HasForeignKey(c => c.Patient_ID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>()
+                .HasOne(c => c.Doctor)
+                .WithMany()
+                .HasForeignKey(c => c.Doctor_ID)
+                .OnDelete(DeleteBehavior.Restrict);}
         }
