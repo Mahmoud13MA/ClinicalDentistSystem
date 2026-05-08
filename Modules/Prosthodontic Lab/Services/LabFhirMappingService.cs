@@ -18,6 +18,21 @@ public class LabFhirMappingService : ILabFhirMappingService
         };
     }
 
+    public DeviceRequest MapServiceRequestToDeviceRequest(ServiceRequest labOrderRequest)
+    {
+        ArgumentNullException.ThrowIfNull(labOrderRequest);
+
+        return new DeviceRequest
+        {
+            Id = labOrderRequest.Id,
+            Status = MapStatus(labOrderRequest.Status),
+            Intent = RequestIntent.Order,
+            Code = labOrderRequest.Code,
+            Subject = labOrderRequest.Subject,
+            Occurrence = labOrderRequest.Occurrence
+        };
+    }
+
     public Hl7.Fhir.Model.Task MapPrescriptionToTask(Prescription prescription)
     {
         return new Hl7.Fhir.Model.Task
@@ -31,5 +46,10 @@ public class LabFhirMappingService : ILabFhirMappingService
                 End = (prescription.DueDate == default ? DateTime.UtcNow : prescription.DueDate).ToString("O")
             }
         };
+    }
+
+    private static RequestStatus? MapStatus(RequestStatus? status)
+    {
+        return status ?? RequestStatus.Active;
     }
 }
