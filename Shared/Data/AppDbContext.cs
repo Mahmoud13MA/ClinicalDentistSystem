@@ -170,16 +170,18 @@ namespace clinical.APIs.Shared.Data
                         .WithMany(o => o.Prescriptions)
                         .HasForeignKey(p => p.OrderID)
                         .OnDelete(DeleteBehavior.Cascade);
-                }
-            modelBuilder.Entity<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>()
-                .HasOne(c => c.Patient)
-                .WithMany(p => p.ConsentRequests)
-                .HasForeignKey(c => c.Patient_ID)
-                .OnDelete(DeleteBehavior.Cascade);
+                    modelBuilder.Entity<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>()
+                        .HasOne(c => c.Patient)
+                        .WithMany(p => p.ConsentRequests)
+                        .HasForeignKey(c => c.Patient_ID)
+                        .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>()
-                .HasOne(c => c.Doctor)
-                .WithMany()
-                .HasForeignKey(c => c.Doctor_ID)
-                .OnDelete(DeleteBehavior.Restrict);}
+                    modelBuilder.Entity<clinical.APIs.Modules.PatientPortal.Models.ConsentRequest>()
+                        .HasOne(c => c.Doctor)
+                        .WithMany()
+                        .HasForeignKey(c => c.Doctor_ID)
+                        .OnDelete(DeleteBehavior.Restrict);
+                }
+            
+          }
         }
