@@ -159,11 +159,12 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.CustomSchemaIds(type => type.FullName ?? type.Name);
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "Clinical Dentist System API",
         Version = "v1",
-        Description = "API for Clinical Dentist Management System with JWT Authentication and AI-Powered EHR Assistance"
+        Description = "API for Clinical Dentist Management System"
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
