@@ -58,6 +58,7 @@ namespace clinical.APIs.Shared.Services
             // but ideally we should inject configuration to get the host URL
 
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            var jwtService = scope.ServiceProvider.GetRequiredService<clinical.APIs.Shared.Security.IJwtService>();
             // Assume the API URL is injected or we just dispatch it internally. 
             // the most robust way in asp.net core for background tasks is sometimes 
             // internal dispatching, but HttpClient is easier if Kestrel is running
@@ -69,6 +70,7 @@ namespace clinical.APIs.Shared.Services
                 ?? "https://localhost:7044";
             var client = httpClientFactory.CreateClient("LocalSyncClient");
             client.BaseAddress = new Uri(baseUrl);
+            var systemToken = CreateSystemToken(jwtService, configuration);
 
             foreach (var op in pendingOperations)
             {
@@ -94,6 +96,7 @@ namespace clinical.APIs.Shared.Services
                     // if it fails or if we need to bypass some auth (though usually we'd need a token)
                     // we'll assume the system can accept requests with a special header or we generate a system token
                     request.Headers.Add("X-System-Sync", "true");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", systemToken);
 
                     var response = await client.SendAsync(request, cancellationToken);
 
@@ -126,6 +129,24 @@ namespace clinical.APIs.Shared.Services
 
                 await queueContext.SaveChangesAsync(cancellationToken);
             }
+        }
+
+        private static string CreateSystemToken(
+            clinical.APIs.Shared.Security.IJwtService jwtService,
+            IConfiguration configuration)
+        {
+            var syncSettings = configuration.GetSection("SyncAuth");
+            var systemUserId = syncSettings["UserId"] ?? "0";
+            var systemEmail = syncSettings["Email"] ?? "system-sync@clinicaldentist.local";
+            var systemName = syncSettings["Name"] ?? "System Sync";
+            var systemRole = syncSettings["Role"] ?? "Admin";
+
+            if (!int.TryParse(systemUserId, out var parsedUserId))
+            {
+                parsedUserId = 0;
+            }
+
+            return jwtService.GenerateToken(parsedUserId, systemEmail, systemName, systemRole);
         }
     }
 }
