@@ -3,6 +3,8 @@ using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.DentalClinic.Models;
 using clinical.APIs.Modules.ProsthodonticLab.DTOs;
 using clinical.APIs.Shared.Data;
+using clinical.APIs.Modules.ProsthodonticLab.Handlers;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +14,7 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
     [Authorize(Policy = "LabTechnician")]
     [ApiController]
     [Route("api/v1/prosthodonticlab/[controller]")]
-    public class OrderController(AppDbContext context, IMapper mapper) : ControllerBase
+    public class OrderController(AppDbContext context, IMapper mapper, IMediator mediator) : ControllerBase
     {
         [HttpGet]
         public async Task<IActionResult> GetOrders()
@@ -83,6 +85,11 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
             order.Status = request.Status;
 
             await context.SaveChangesAsync();
+
+            if (string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                await mediator.Publish(new LabOrderCompletedEventTrigger(order.OrderID), HttpContext.RequestAborted);
+            }
 
             var response = mapper.Map<OrderResponse>(order);
 

@@ -9,21 +9,21 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public int Appointment_ID { get; set; }
         public DateTime Date { get; set; }
         public TimeSpan Time { get; set; }
-        public string Ref_Num { get; set; }
-        public string Type { get; set; }
+        public string Ref_Num { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
 
        
         public int Patient_ID { get; set; }
-        public Patient Patient { get; set; }
+        public Patient? Patient { get; set; }
 
         public int Doctor_ID { get; set; }
-        public Doctor Doctor { get; set; }
+        public Doctor? Doctor { get; set; }
 
         [ForeignKey("Nurse")]
         public int Nurse_ID { get; set; }
-        public Nurse Nurse { get; set; }
+        public Nurse? Nurse { get; set; }
 
         // One-to-One relationship with EHR
-        public EHR EHR { get; set; }
+        public EHR? EHR { get; set; }
     }
 }

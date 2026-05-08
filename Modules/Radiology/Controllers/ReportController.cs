@@ -2,6 +2,10 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.Radiology.DTOs;
 using clinical.APIs.Shared.Data;
+using ClinicalDentistSystem.Shared.Contracts.Diagnostics;
+using Hl7.Fhir.Model;
+using MediatR;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +16,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
     [Authorize(Policy = "RadiologistOrAdmin")]
     [ApiController]
     [Route("api/v1/radiology/[controller]")]
-    public class ReportController(AppDbContext context , IMapper mapper) : ControllerBase
+    public class ReportController(AppDbContext context , IMapper mapper, IMediator mediator) : ControllerBase
     {
 
         [HttpGet]
@@ -112,6 +116,9 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             context.Reports.Add(report);
             await context.SaveChangesAsync();
 
+            var diagnosticReport = BuildDiagnosticReport(report, imaging);
+            await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+
             var response = mapper.Map<ReportResponse>(report);
             return CreatedAtAction(nameof(GetReportById), new { reportId = report.ReportID }, response);
         }
@@ -149,8 +156,37 @@ namespace clinical.APIs.Modules.Radiology.Controllers
 
             await context.SaveChangesAsync();
 
+            var diagnosticReport = BuildDiagnosticReport(report, imaging);
+            await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+
             var response = mapper.Map<ReportResponse>(report);
             return Ok(new { message = "Report updated successfully", data = response });
+        }
+
+        private DiagnosticReport BuildDiagnosticReport(Report report, ImagingAppointment imaging)
+        {
+            var reportId = report.ReportID.ToString();
+            var status = DiagnosticReport.DiagnosticReportStatus.Final;
+            var effectiveDate = imaging.Datetime == default ? DateTime.UtcNow : imaging.Datetime;
+            var reportDate = report.ImagingAppointment?.Datetime ?? effectiveDate;
+
+            return new DiagnosticReport
+            {
+                Id = reportId,
+                Status = status,
+                Code = new CodeableConcept { Text = imaging.Type },
+                Effective = new FhirDateTime(reportDate),
+                Subject = new ResourceReference($"Patient/{report.PatientID}"),
+                Conclusion = report.Findings,
+                PresentedForm = new List<Attachment>
+                {
+                    new()
+                    {
+                        ContentType = "text/plain",
+                        Data = Encoding.UTF8.GetBytes(report.Diagnosis)
+                    }
+                }
+            };
         }
 
        

@@ -15,8 +15,8 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public int Supply_ID { get; set; }
 
         // Navigation Properties
-        public Doctor Doctor { get; set; }
-        public Supply Supply { get; set; }
+        public Doctor ? Doctor { get; set; }
+        public Supply? Supply { get; set; }
     }
 }
 

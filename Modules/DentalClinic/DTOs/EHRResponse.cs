@@ -41,8 +41,8 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
     public class MedicationRecordResponse
     {
         public int Medication_ID { get; set; }
-        public string Name { get; set; }
-        public string? Dosage { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Dosage { get; set; } 
         public string? Frequency { get; set; }
         public string? Route { get; set; }
         public DateTime? StartDate { get; set; }
@@ -53,8 +53,8 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
     public class ProcedureRecordResponse
     {
         public int Procedure_ID { get; set; }
-        public string Code { get; set; }
-        public string Description { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
         public DateTime PerformedAt { get; set; }
         public string? ToothNumber { get; set; }
         public string? Status { get; set; }
@@ -76,7 +76,7 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
     public class XRayRecordResponse
     {
         public int XRay_ID { get; set; }
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
         public string? Findings { get; set; }
         public string? ImagePath { get; set; }
         public bool HasImage { get; set; }

@@ -20,6 +20,7 @@ namespace clinical.APIs.Shared.Data
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.ProcedureRecord> ProcedureRecords { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.ToothRecord> ToothRecords { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.XRayRecord> XRayRecords { get; set; }
+        public DbSet<clinical.APIs.Modules.DentalClinic.Models.DiagnosticReportMetadata> DiagnosticReportMetadata { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Supply> Supplies { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction> StockTransactions { get; set; }
 
@@ -34,6 +35,7 @@ namespace clinical.APIs.Shared.Data
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.LabTechnician> LabTechnicians { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Prescription> Prescriptions { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Order> Orders { get; set; }
+        public DbSet<clinical.APIs.Modules.ProsthodonticLab.Models.DiagnosticReportMetadata> LabDiagnosticReportMetadata { get; set; }
 
         public DbSet<clinical.APIs.Shared.Models.ProcessedRequest> ProcessedRequests { get; set; }
 

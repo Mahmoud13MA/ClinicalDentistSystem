@@ -1,4 +1,5 @@
 ﻿using clinical.APIs.Modules.DentalClinic.Services;
+using ClinicalDentistSystem.Shared.Contracts.Patients;
 
 namespace clinical.APIs.Modules.DentalClinic
 {
@@ -15,6 +16,7 @@ namespace clinical.APIs.Modules.DentalClinic
             services.AddScoped<IDoctorMappingService, DoctorMappingService>();
             services.AddScoped<IStockTransactionMappingService, StockTransactionMappingService>();
             services.AddScoped<IProfileManagementService, ProfileManagementService>();
+            services.AddScoped<IDentalClinicPatientFhirMapper, DentalClinicPatientFhirMapper>();
 
             // AI
             services.AddHttpClient<ILlamaService, LlamaService>();

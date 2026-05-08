@@ -17,9 +17,7 @@ namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
 
         [Range(11, 48, ErrorMessage = "Tooth number must be between 11 and 48.")]
         public int ToothNumber { get; set; }
-
         public string Notes { get; set; } = string.Empty;
-        public decimal UnitPrice { get; set; }
         public DateTime DueDate { get; set; }
     }
 
@@ -39,10 +37,6 @@ namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
         public DateTime DueDate { get; set; }
     }
 
-    public class PrescriptionPatchStatusRequest
-    {
-        public string Status { get; set; } = string.Empty;
-    }
 
     public class PrescriptionResponse
     {
@@ -58,7 +52,6 @@ namespace clinical.APIs.Modules.ProsthodonticLab.DTOs
         public string CaseType { get; set; } = string.Empty;
         public int ToothNumber { get; set; }
         public string Notes { get; set; } = string.Empty;
-        public decimal UnitPrice { get; set; }
         public DateTime DueDate { get; set; }
     }
 }

@@ -6,11 +6,11 @@ namespace clinical.APIs.Modules.Radiology.DTOs
         public DateTime Datetime { get; set; }
         public string Type { get; set; } = string.Empty;
         public int PatientID { get; set; }
-        public PatientBasicInfoRadiology Patient { get; set; }
+        public PatientBasicInfoRadiology? Patient { get; set; }
         public int RadiologistID { get; set; }
-        public RadiologistBasicInfo Radiologist { get; set; }
+        public RadiologistBasicInfo? Radiologist { get; set; }
         public int EquipmentID { get; set; }
-        public EquipmentResponseBasicInfo Equipment { get; set; }
+        public EquipmentResponseBasicInfo? Equipment { get; set; }
     }
 
     public class PatientBasicInfoRadiology

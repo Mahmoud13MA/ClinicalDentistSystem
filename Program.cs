@@ -1,5 +1,10 @@
 ﻿using clinical.APIs.Modules.DentalClinic;
 using clinical.APIs.Modules.DentalClinic.Services;
+using clinical.APIs.Modules.ProsthodonticLab.Services;
+using clinical.APIs.Modules.Radiology.Services;
+using ClinicalDentistSystem.Shared.Contracts.Radiology;
+using ClinicalDentistSystem.Shared.Contracts.Lab;
+using MediatR;
 using clinical.APIs.Modules.Radiology.MappingProfiles;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Filters;
@@ -92,6 +97,10 @@ builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
 builder.Services.AddHttpClient("LocalSyncClient");
 builder.Services.AddHostedService<clinical.APIs.Shared.Services.BackgroundSyncService>();
 builder.Services.AddAutoMapper(typeof(RadiologyMappingProfile), typeof(clinical.APIs.Modules.ProsthodonticLab.MappingProfiles.ProsthodonticLabMappingProfile));
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
+builder.Services.AddScoped<IRadiologyModule, RadiologyModuleService>();
+builder.Services.AddScoped<ILabModule, LabModuleService>();
+builder.Services.AddScoped<ILabFhirMappingService, LabFhirMappingService>();
 
 // Module services
 builder.Services.AddDentalClinicModule();
