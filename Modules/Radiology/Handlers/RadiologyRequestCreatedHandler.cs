@@ -1,20 +1,21 @@
 using ClinicalDentistSystem.Shared.Contracts.Diagnostics;
+using ClinicalDentistSystem.Shared.Contracts.Radiology;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Radiology.Models;
 using System.Text.Json;
-using SystemTask = System.Threading.Tasks.Task; // ← alias fixes ambiguity
+using SystemTask = System.Threading.Tasks.Task;
 
 namespace clinical.APIs.Modules.Radiology.Handlers;
 
 public class RadiologyRequestCreatedHandler(
     AppDbContext context,
     LocalQueueDbContext queueContext,
+    IMediator mediator,                    // ← added to publish scheduled event
     ILogger<RadiologyRequestCreatedHandler> logger)
     : INotificationHandler<RadiologyRequestCreatedEvent>
 {
@@ -72,9 +73,16 @@ public class RadiologyRequestCreatedHandler(
         logger.LogInformation(
             "Scheduled imaging appointment for Patient={PatientId}, Radiologist={RadiologistId}, Equipment={EquipmentId}, Modality={Modality}",
             patientId, radiologistId, equipmentId, modality);
+
+        // ← Notify DentalClinic that appointment was scheduled
+        await mediator.Publish(new ImagingAppointmentScheduledEvent(
+            appointment.ImagingID,
+            patientId.Value,
+            modality,
+            appointment.Datetime), cancellationToken);
     }
 
-    private async SystemTask EnqueueFallbackAsync(  // ← SystemTask fixes return type error
+    private async SystemTask EnqueueFallbackAsync(
         ServiceRequest request,
         string modality,
         int patientId,
@@ -97,7 +105,7 @@ public class RadiologyRequestCreatedHandler(
             var operation = new PendingOperation
             {
                 HttpMethod = "POST",
-                Route = "api/v1/radiology/imagingappointment",
+                Route = "api/v1/radiology/imagingappointment/retry",
                 Payload = JsonSerializer.Serialize(new
                 {
                     PatientID = patientId,
