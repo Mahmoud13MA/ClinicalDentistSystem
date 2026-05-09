@@ -4,6 +4,7 @@ using clinical.APIs.Modules.Radiology.DTOs;
 using clinical.APIs.Shared.Data;
 using ClinicalDentistSystem.Shared.Contracts.Diagnostics;
 using Hl7.Fhir.Model;
+using ClinicalDentistSystem.Shared.Services;
 using MediatR;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +17,7 @@ namespace clinical.APIs.Modules.Radiology.Controllers
     [Authorize(Policy = "RadiologistOrAdmin")]
     [ApiController]
     [Route("api/v1/radiology/[controller]")]
-    public class ReportController(AppDbContext context , IMapper mapper, IMediator mediator) : ControllerBase
+    public class ReportController(AppDbContext context , IMapper mapper, IMediator mediator, IFhirValidationService validationService) : ControllerBase
     {
 
         [HttpGet]
@@ -117,7 +118,11 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             await context.SaveChangesAsync();
 
             var diagnosticReport = BuildDiagnosticReport(report, imaging);
-            await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+            var outcome = validationService.Validate(diagnosticReport);
+            if (!HasErrors(outcome))
+            {
+                await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+            }
 
             var response = mapper.Map<ReportResponse>(report);
             return CreatedAtAction(nameof(GetReportById), new { reportId = report.ReportID }, response);
@@ -157,11 +162,18 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             await context.SaveChangesAsync();
 
             var diagnosticReport = BuildDiagnosticReport(report, imaging);
-            await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+            var outcome = validationService.Validate(diagnosticReport);
+            if (!HasErrors(outcome))
+            {
+                await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+            }
 
             var response = mapper.Map<ReportResponse>(report);
             return Ok(new { message = "Report updated successfully", data = response });
         }
+
+        private static bool HasErrors(OperationOutcome outcome)
+            => outcome.Issue.Any(issue => issue.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal);
 
         private DiagnosticReport BuildDiagnosticReport(Report report, ImagingAppointment imaging)
         {

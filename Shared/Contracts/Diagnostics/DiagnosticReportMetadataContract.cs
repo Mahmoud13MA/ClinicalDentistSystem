@@ -1,6 +1,6 @@
 namespace ClinicalDentistSystem.Shared.Contracts.Diagnostics;
 
-public record DiagnosticReportMetadata(
+public record DiagnosticReportMetadataContract(
     string ReportId,
     DateTime ReportDate,
     string Title,

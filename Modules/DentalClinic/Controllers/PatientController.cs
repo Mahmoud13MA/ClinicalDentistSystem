@@ -1,17 +1,19 @@
-﻿using clinical.APIs.Modules.DentalClinic.Models;
+﻿using clinical.APIs.Modules.DentalClinic.DTOs;
+using clinical.APIs.Modules.DentalClinic.Models;
+using clinical.APIs.Modules.DentalClinic.Services;
+using clinical.APIs.Shared.Data;
+using ClinicalDentistSystem.Shared.Contracts.Patients;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using clinical.APIs.Shared.Data;
-using clinical.APIs.Modules.DentalClinic.DTOs;
-using clinical.APIs.Modules.DentalClinic.Services;
 
 namespace clinical.APIs.Modules.DentalClinic.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api/v1/clinic/[controller]")]
-    public class PatientController(AppDbContext context, IPatientMappingService mappingService, IProfileManagementService profileManagement) : ControllerBase
+    public class PatientController(AppDbContext context, IPatientMappingService mappingService, IProfileManagementService profileManagement ,IMediator mediator ) : ControllerBase
     {
 
         [HttpGet]
@@ -81,5 +83,21 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers
 
             return Ok(new { message = "Patient updated successfully.", patient = response });
         }
+
+
+
+        [HttpGet("{id}/fhir")]
+        public async Task<IActionResult> GetPatientFhirResourceQuery(string id, CancellationToken ct)
+        {
+            var fhirPatient = await mediator.Send(new GetPatientByIdQuery(id), ct);
+
+            if (fhirPatient is null)
+                return NotFound(new { error = "Patient not found", id });
+
+            return Ok(fhirPatient);
+        }
+
+
+
     }
 }

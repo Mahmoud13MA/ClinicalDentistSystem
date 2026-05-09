@@ -4,7 +4,7 @@ using clinical.APIs.Modules.ProsthodonticLab.Services;
 using clinical.APIs.Modules.Radiology.Services;
 using ClinicalDentistSystem.Shared.Contracts.Radiology;
 using ClinicalDentistSystem.Shared.Contracts.Lab;
-using MediatR;
+using ClinicalDentistSystem.Shared.Services;
 using clinical.APIs.Modules.Radiology.MappingProfiles;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Filters;
@@ -18,25 +18,34 @@ using Microsoft.OpenApi.Models;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Kestrel with fallback ports if primary ports are in use
-builder.WebHost.ConfigureKestrel(serverOptions =>
+var isRailway = Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT") != null;
+
+// ── Port / Kestrel ──────────────────────────────────────────────────────────
+if (isRailway)
 {
-    var httpPort = FindAvailablePort(5107);
-    var httpsPort = FindAvailablePort(7044);
-    
-    serverOptions.Listen(IPAddress.Loopback, httpPort);
-    serverOptions.Listen(IPAddress.Loopback, httpsPort, listenOptions =>
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+else
+{
+    builder.WebHost.ConfigureKestrel(serverOptions =>
     {
-        listenOptions.UseHttps();
+        var httpPort = FindAvailablePort(5107);
+        var httpsPort = FindAvailablePort(7044);
+
+        serverOptions.Listen(IPAddress.Loopback, httpPort);
+        serverOptions.Listen(IPAddress.Loopback, httpsPort, listenOptions =>
+        {
+            listenOptions.UseHttps();
+        });
+
+        if (httpPort != 5107 || httpsPort != 7044)
+            Console.WriteLine($"⚠ Using alternate ports - HTTP: {httpPort}, HTTPS: {httpsPort}");
     });
-    
-    if (httpPort != 5107 || httpsPort != 7044)
-    {
-        Console.WriteLine($"⚠ Using alternate ports - HTTP: {httpPort}, HTTPS: {httpsPort}");
-    }
-});
+}
 
 static int FindAvailablePort(int startPort)
 {
@@ -50,24 +59,26 @@ static int FindAvailablePort(int startPort)
         }
         catch (SocketException)
         {
-            // Port is unavailable; try the next one.
             continue;
         }
     }
     throw new InvalidOperationException($"No available ports found starting from {startPort}");
 }
 
-// Configure services
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// ── Database ────────────────────────────────────────────────────────────────
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
 if (string.IsNullOrWhiteSpace(connectionString))
-{
     throw new InvalidOperationException("Connection string 'DefaultConnection' is missing or empty.");
-}
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlServer(connectionString, sqlOptions =>
-        sqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null));
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null));
 
     if (builder.Environment.IsDevelopment())
     {
@@ -76,47 +87,55 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
 });
 
-// Configure SQLite Fallback Queue DB
-builder.Services.AddDbContext<LocalQueueDbContext>(opts => 
-    opts.UseSqlite("Data Source=local_fallback_queue.db"));
+// ── SQLite Fallback Queue ───────────────────────────────────────────────────
+var sqlitePath = isRailway
+    ? "Data Source=/tmp/local_fallback_queue.db"
+    : "Data Source=local_fallback_queue.db";
 
+builder.Services.AddDbContext<LocalQueueDbContext>(opts =>
+    opts.UseSqlite(sqlitePath));
+
+// ── CORS ────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowNextJs", policy =>
-        policy.WithOrigins("http://localhost:3000", "https://localhost:3000")
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials());
+        policy.WithOrigins(
+            "http://localhost:3000",
+            "https://localhost:3000",
+            "https://your-app.railway.app") // ← replace with your Railway URL
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials());
 });
 
-// Core services
+// ── Core Services ───────────────────────────────────────────────────────────
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
 builder.Services.AddScoped<clinical.APIs.Shared.Services.IEmailValidationService, clinical.APIs.Shared.Services.EmailValidationService>();
 builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
+builder.Services.AddScoped<IFhirValidationService, FhirValidationService>();
 builder.Services.AddHttpClient("LocalSyncClient");
 builder.Services.AddHostedService<clinical.APIs.Shared.Services.BackgroundSyncService>();
-builder.Services.AddAutoMapper(typeof(RadiologyMappingProfile), typeof(clinical.APIs.Modules.ProsthodonticLab.MappingProfiles.ProsthodonticLabMappingProfile));
+builder.Services.AddAutoMapper(
+    typeof(RadiologyMappingProfile),
+    typeof(clinical.APIs.Modules.ProsthodonticLab.MappingProfiles.ProsthodonticLabMappingProfile));
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddScoped<IRadiologyModule, RadiologyModuleService>();
 builder.Services.AddScoped<ILabModule, LabModuleService>();
 builder.Services.AddScoped<ILabFhirMappingService, LabFhirMappingService>();
+builder.Services.AddSingleton<ClinicalDentistSystem.Shared.Serialization.FhirSerializationUtility>();
 
-// Module services
+// ── Module Services ─────────────────────────────────────────────────────────
 builder.Services.AddDentalClinicModule();
 
-
-
-// JWT Authentication
+// ── JWT Authentication ───────────────────────────────────────────────────────
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"];
 var issuer = jwtSettings["Issuer"];
 var audience = jwtSettings["Audience"];
 
 if (string.IsNullOrWhiteSpace(secretKey) || string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
-{
     throw new InvalidOperationException("JwtSettings configuration is incomplete. SecretKey, Issuer, and Audience are required.");
-}
 
 builder.Services.AddAuthentication(options =>
 {
@@ -131,8 +150,8 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = issuer, // Use the validated variable
-        ValidAudience = audience, // Use the validated variable
+        ValidIssuer = issuer,
+        ValidAudience = audience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
     };
     options.MapInboundClaims = false;
@@ -149,13 +168,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("LabTechnician", policy => policy.RequireRole("LabTechnician"));
 });
 
-// Configure Global MVC Filters
+// ── MVC + Filters ────────────────────────────────────────────────────────────
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<IdempotencyFilter>();
 });
 
-// Swagger
+// ── Swagger ──────────────────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -180,34 +199,35 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
             Array.Empty<string>()
         }
     });
 });
 
+// ── Build ────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-// Start Ollama (simplified - just 2 lines!)
+// ── Ollama ───────────────────────────────────────────────────────────────────
 var ollama = app.Services.GetRequiredService<OllamaManager>();
 await ollama.StartWithFallbackAsync();
 
-// Initialize database
+// ── Database Migration ───────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
 
-     // Apply migrations for Local Fallback DB as well, to keep schema management consistent
-     var queueContext = scope.ServiceProvider.GetRequiredService<LocalQueueDbContext>();
-     await queueContext.Database.EnsureCreatedAsync();
-
+    var queueContext = scope.ServiceProvider.GetRequiredService<LocalQueueDbContext>();
+    await queueContext.Database.EnsureCreatedAsync();
 }
 
-// Configure pipeline
+// ── Middleware Pipeline ───────────────────────────────────────────────────────
 app.UseMiddleware<GlobalExceptionMiddleware>();
-
-app.UseMiddleware<DatabaseOutageMiddleware>(); 
+app.UseMiddleware<DatabaseOutageMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -220,14 +240,18 @@ else
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirection — local only, Railway handles SSL at proxy level
+if (!isRailway)
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseCors("AllowNextJs");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Map("/error", () => Results.Problem("An unexpected server error occurred."));
 
-// Cleanup on shutdown
 app.Lifetime.ApplicationStopping.Register(ollama.Stop);
 
 app.Run();

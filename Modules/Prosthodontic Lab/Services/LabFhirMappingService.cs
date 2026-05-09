@@ -14,7 +14,8 @@ public class LabFhirMappingService : ILabFhirMappingService
             Intent = RequestIntent.Order,
             Code = new CodeableConcept { Text = string.IsNullOrWhiteSpace(order.Notes) ? "Lab Order" : order.Notes },
             Subject = new ResourceReference($"Patient/{order.PatientId}"),
-            Occurrence = new FhirDateTime(order.RequiredDate == default ? order.OrderDate : order.RequiredDate)
+            Occurrence = new FhirDateTime(order.RequiredDate == default ? order.OrderDate : order.RequiredDate),
+            Requester = new ResourceReference($"Practitioner/{order.DentistId}")
         };
     }
 
@@ -29,7 +30,8 @@ public class LabFhirMappingService : ILabFhirMappingService
             Intent = RequestIntent.Order,
             Code = labOrderRequest.Code,
             Subject = labOrderRequest.Subject,
-            Occurrence = labOrderRequest.Occurrence
+            Occurrence = labOrderRequest.Occurrence,
+            Requester = labOrderRequest.Requester  // ← fix: belongs here, not above
         };
     }
 

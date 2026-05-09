@@ -2,8 +2,12 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.DentalClinic.Models;
 using clinical.APIs.Modules.ProsthodonticLab.DTOs;
+using clinical.APIs.Modules.ProsthodonticLab.Services;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Modules.ProsthodonticLab.Handlers;
+using ClinicalDentistSystem.Shared.Contracts.Lab;
+using ClinicalDentistSystem.Shared.Services;
+using Hl7.Fhir.Model;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +18,13 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
     [Authorize(Policy = "LabTechnician")]
     [ApiController]
     [Route("api/v1/prosthodonticlab/[controller]")]
-    public class OrderController(AppDbContext context, IMapper mapper, IMediator mediator) : ControllerBase
+    public class OrderController(
+        AppDbContext context,
+        IMapper mapper,
+        IMediator mediator,
+        ILabFhirMappingService mappingService,
+        IFhirValidationService validationService,
+        ILogger<OrderController> logger) : ControllerBase
     {
         [HttpGet]
         public async Task<IActionResult> GetOrders()
@@ -50,6 +60,17 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
             context.Orders.Add(order);
             await context.SaveChangesAsync();
 
+            var deviceRequest = mappingService.MapOrderToDeviceRequest(order);
+            var outcome = validationService.Validate(deviceRequest);
+            if (HasErrors(outcome))
+            {
+                logger.LogWarning("FHIR validation failed for lab DeviceRequest {Id}", deviceRequest.Id);
+            }
+            else
+            {
+                await mediator.Publish(new LabOrderCreatedEvent(deviceRequest), HttpContext.RequestAborted);
+            }
+
             var response = mapper.Map<OrderResponse>(order);
 
             return CreatedAtAction(nameof(GetOrder), new { id = order.OrderID }, response);
@@ -67,6 +88,11 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
             mapper.Map(request, order);
 
             await context.SaveChangesAsync();
+
+            if (string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                await mediator.Publish(new LabOrderCompletedEventTrigger(order.OrderID), HttpContext.RequestAborted);
+            }
 
             var response = mapper.Map<OrderResponse>(order);
 
@@ -110,5 +136,8 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
 
             return Ok(new { message = "Order deleted successfully.", orderID = id });
         }
+
+        private static bool HasErrors(OperationOutcome outcome)
+            => outcome.Issue.Any(issue => issue.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal);
     }
 }

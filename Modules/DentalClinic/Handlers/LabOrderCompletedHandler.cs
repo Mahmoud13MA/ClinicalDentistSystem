@@ -1,18 +1,19 @@
 using System.Text.Json;
 using ClinicalDentistSystem.Shared.Contracts.Lab;
-using clinical.APIs.Modules.ProsthodonticLab.Models;
+using ClinicalDentistSystem.Shared.Serialization;
 using clinical.APIs.Shared.Data;
 using clinical.APIs.Shared.Models;
-using Hl7.Fhir.Model;
+using clinical.APIs.Shared.Utilities;
 using MediatR;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace clinical.APIs.Modules.DentalClinic.Handlers;
 
 public class LabOrderCompletedHandler(
     AppDbContext context,
     LocalQueueDbContext queueContext,
+    FhirSerializationUtility fhirSerialization,
     ILogger<LabOrderCompletedHandler> logger) : INotificationHandler<LabOrderCompletedEvent>
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -22,107 +23,98 @@ public class LabOrderCompletedHandler(
         var metadata = ExtractMetadata(notification);
         if (metadata == null)
         {
+            logger.LogWarning("LabOrderCompletedEvent received with null Task payload — skipping.");
             return;
         }
 
         try
         {
             var exists = await context.LabDiagnosticReportMetadata
-                .AnyAsync(x => x.ReportId == metadata.ReportId, cancellationToken);
+                .AnyAsync(x => x.OrderId == metadata.OrderId, cancellationToken);
+
             if (exists)
             {
+                logger.LogInformation("Lab metadata for order {OrderId} already exists — skipping duplicate.", metadata.OrderId);
                 return;
             }
 
             context.LabDiagnosticReportMetadata.Add(metadata);
             await context.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation("Lab metadata saved for order {OrderId}.", metadata.OrderId);
         }
-        catch (Exception ex) when (IsConnectivityError(ex))
+        catch (Exception ex) when (ConnectivityErrorDetector.IsConnectivityError(ex))
         {
-            await QueueFallbackAsync(metadata, ex, cancellationToken);
+            logger.LogWarning("DB connectivity error saving lab metadata for order {OrderId} — queuing for retry.", metadata.OrderId);
+            await QueueFallbackAsync(notification.LabOrder, metadata, ex, cancellationToken);
         }
     }
 
-    private static DiagnosticReportMetadata? ExtractMetadata(LabOrderCompletedEvent notification)
+    private static LabDiagnosticReportMetadata? ExtractMetadata(LabOrderCompletedEvent notification)
     {
-        var resource = notification.LabOrder;
-        var status = resource switch
-        {
-            Hl7.Fhir.Model.Task task => task.Status?.ToString() ?? "unknown",
-            Hl7.Fhir.Model.DeviceRequest request => request.Status?.ToString() ?? "unknown",
-            _ => "unknown"
-        };
+        var task = notification.LabOrder;
 
-        var title = resource switch
-        {
-            Hl7.Fhir.Model.Task task => task.Description ?? "Lab Task",
-            Hl7.Fhir.Model.DeviceRequest request when request.Code is CodeableConcept concept && !string.IsNullOrWhiteSpace(concept.Text)
-                => concept.Text,
-            _ => "Lab Order"
-        };
+        if (task is null)
+            return null;
 
-        var reportDate = DateTime.UtcNow;
-
-        return new DiagnosticReportMetadata
+        return new LabDiagnosticReportMetadata
         {
-            ReportId = resource.Id ?? Guid.NewGuid().ToString("N"),
-            ReportDate = reportDate,
-            Title = title,
-            Status = status
+            OrderId = task.Id ?? Guid.NewGuid().ToString("N"),
+            CompletedDate = DateTime.UtcNow,
+            ProstheticType = task.Description ?? "Lab Order",
+            Status = task.Status?.ToString() ?? "unknown"
         };
     }
 
     private async System.Threading.Tasks.Task QueueFallbackAsync(
-        DiagnosticReportMetadata metadata,
+        Hl7.Fhir.Model.Task? labOrder,
+        LabDiagnosticReportMetadata metadata,
         Exception exception,
         CancellationToken cancellationToken)
     {
-        var payload = JsonSerializer.Serialize(new
+        try
         {
-            reportId = metadata.ReportId,
-            reportDate = metadata.ReportDate,
-            title = metadata.Title,
-            status = metadata.Status
-        }, SerializerOptions);
+            var idempotencyKey = $"lab-metadata-completed-{metadata.OrderId}";  // ← added
 
-        var pendingOp = new PendingOperation
-        {
-            HttpMethod = HttpMethods.Post,
-            Route = "/api/v1/dentalclinic/lab/metadata",
-            Payload = payload,
-            Status = PendingOperationStatus.Pending,
-            LastError = exception.GetBaseException().Message,
-            LastAttemptAt = DateTime.UtcNow
-        };
+            var alreadyQueued = await queueContext.PendingOperations               // ← added duplicate check
+                .AnyAsync(p => p.IdempotencyKey == idempotencyKey
+                            && p.Status == PendingOperationStatus.Pending, cancellationToken);
 
-        queueContext.PendingOperations.Add(pendingOp);
-        await queueContext.SaveChangesAsync(cancellationToken);
+            if (alreadyQueued)
+            {
+                logger.LogInformation("Lab metadata for order {OrderId} already queued — skipping duplicate.", metadata.OrderId);
+                return;
+            }
 
-        logger.LogWarning("Queued lab metadata fallback operation {OperationId} due to connectivity outage.", pendingOp.Id);
-    }
+            var resourceJson = labOrder == null ? null : fhirSerialization.SerializeToJson(labOrder);
+            var payload = JsonSerializer.Serialize(new
+            {
+                orderId = metadata.OrderId,
+                completedDate = metadata.CompletedDate,
+                prostheticType = metadata.ProstheticType,
+                status = metadata.Status,
+                fhirResource = resourceJson
+            }, SerializerOptions);
 
-    private static bool IsConnectivityError(Exception ex)
-    {
-        var rootEx = ex.GetBaseException();
+            var pendingOp = new PendingOperation
+            {
+                HttpMethod = HttpMethods.Post,
+                Route = "/api/v1/dentalclinic/lab/metadata",
+                Payload = payload,
+                IdempotencyKey = idempotencyKey,                                   
+                Status = PendingOperationStatus.Pending,
+                LastError = exception.GetBaseException().Message,
+                LastAttemptAt = DateTime.UtcNow
+            };
 
-        return rootEx switch
-        {
-            SqlException sqlEx => sqlEx.Number is 53 or -2 or -1 or 20 or 64 or 233 or 4060,
-            TimeoutException => true,
-            DbUpdateException dbEx => IsDbUpdateConnectivityError(dbEx),
-            _ => false
-        };
-    }
+            queueContext.PendingOperations.Add(pendingOp);
+            await queueContext.SaveChangesAsync(cancellationToken);
 
-    private static bool IsDbUpdateConnectivityError(DbUpdateException dbEx)
-    {
-        var innerEx = dbEx.InnerException;
-
-        if (innerEx is SqlException sqlEx)
-        {
-            return sqlEx.Number is 53 or -2 or -1 or 20 or 64 or 233 or 4060;
+            logger.LogWarning("Queued lab metadata fallback operation {OperationId} for order {OrderId}.", pendingOp.Id, metadata.OrderId);
         }
-
-        return innerEx is TimeoutException;
+        catch (Exception queueEx)                                                  
+        {
+            logger.LogError(queueEx, "Failed to enqueue lab metadata fallback for order {OrderId}.", metadata.OrderId);
+        }
     }
 }

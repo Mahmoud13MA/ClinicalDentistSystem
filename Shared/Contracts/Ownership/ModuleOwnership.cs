@@ -1,10 +1,10 @@
-
 namespace ClinicalDentistSystem.Shared.Contracts.Ownership;
 
 public enum ModuleName
 {
     DentalClinic,
-    Radiology
+    Radiology,
+    ProsthodonticLab  
 }
 
 public enum DataDomain
@@ -12,7 +12,9 @@ public enum DataDomain
     PatientDemographics,
     ClinicalTimelines,
     DiagnosticImages,
-    DiagnosticReports
+    DiagnosticReports,
+    ProstheticOrders,   
+    LabTechnicians      
 }
 
 public static class ModuleOwnership
@@ -29,6 +31,11 @@ public static class ModuleOwnership
             {
                 DataDomain.DiagnosticImages,
                 DataDomain.DiagnosticReports
+            },
+            [ModuleName.ProsthodonticLab] = new[]  // ← added
+            {
+                DataDomain.ProstheticOrders,
+                DataDomain.LabTechnicians
             }
         };
 

@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace clinical.APIs.Modules.ProsthodonticLab.Models;
+namespace clinical.APIs.Shared.Models;
 
 public class DiagnosticReportMetadata
 {

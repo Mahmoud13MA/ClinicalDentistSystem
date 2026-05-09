@@ -1,5 +1,5 @@
-using clinical.APIs.Modules.ProsthodonticLab.Models;
 using clinical.APIs.Shared.Data;
+using clinical.APIs.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,7 @@ namespace clinical.APIs.Modules.DentalClinic.Controllers;
 public class LabMetadataController(AppDbContext context) : ControllerBase
 {
     [HttpPost("metadata")]
-    public async Task<IActionResult> CreateMetadata([FromBody] DiagnosticReportMetadata metadata)
+    public async Task<IActionResult> CreateMetadata([FromBody] LabDiagnosticReportMetadata metadata)
     {
         context.LabDiagnosticReportMetadata.Add(metadata);
         await context.SaveChangesAsync();
