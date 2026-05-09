@@ -22,9 +22,11 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 var isRailway = Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT") != null;
+var isContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+
 
 // ── Port / Kestrel ──────────────────────────────────────────────────────────
-if (isRailway)
+if (isRailway || isContainer)
 {
     var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
