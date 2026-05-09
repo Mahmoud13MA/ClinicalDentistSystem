@@ -9,7 +9,7 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public int XRay_ID { get; set; }
 
         [Required]
-        public string Type { get; set; }           
+        public string Type { get; set; }   = string.Empty;        
         
         public string? Findings { get; set; }         
         public string? ImagePath { get; set; }        

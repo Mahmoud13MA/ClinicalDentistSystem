@@ -9,10 +9,10 @@ namespace clinical.APIs.Modules.DentalClinic.Models
         public int Procedure_ID { get; set; }
 
         [Required]
-        public string Code { get; set; }               // D1110, D2740, etc.
-        
+        public string Code { get; set; } = string.Empty;              // D1110, D2740, etc.
+
         [Required]
-        public string Description { get; set; }        // Procedure description
+        public string Description { get; set; } = string.Empty;       // Procedure description
         
         public DateTime PerformedAt { get; set; }
         

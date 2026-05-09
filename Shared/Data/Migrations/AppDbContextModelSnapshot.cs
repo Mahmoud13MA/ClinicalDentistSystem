@@ -819,6 +819,68 @@ namespace clinical.APIs.Migrations
                     b.ToTable("XRayRecords");
                 });
 
+            modelBuilder.Entity("clinical.APIs.Shared.Models.DiagnosticReportMetadata", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ReportDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReportId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DiagnosticReportMetadata");
+                });
+
+            modelBuilder.Entity("clinical.APIs.Shared.Models.LabDiagnosticReportMetadata", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CompletedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OrderId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ProstheticType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LabDiagnosticReportMetadata");
+                });
+
             modelBuilder.Entity("clinical.APIs.Shared.Models.ProcessedRequest", b =>
                 {
                     b.Property<string>("IdempotencyKey")
@@ -1089,8 +1151,7 @@ namespace clinical.APIs.Migrations
 
             modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Appointment", b =>
                 {
-                    b.Navigation("EHR")
-                        .IsRequired();
+                    b.Navigation("EHR");
                 });
 
             modelBuilder.Entity("clinical.APIs.Modules.DentalClinic.Models.Doctor", b =>

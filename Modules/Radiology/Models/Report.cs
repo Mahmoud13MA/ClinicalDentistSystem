@@ -24,7 +24,7 @@ namespace Radiology.Models
 
         [ForeignKey("Patient")]
         public int PatientID { get; set; }
-        public Patient Patient { get; set; }
+        public Patient? Patient { get; set; }
 
         [ForeignKey("Radiologist")]
         public int RadiologistID { get; set; }

@@ -9,18 +9,18 @@ namespace clinical.APIs.Modules.DentalClinic.Models
 
         [Required(ErrorMessage = "First name is required")]
         [StringLength(100)]
-        public string First { get; set; }
+        public string First { get; set; } = string.Empty;
 
         [StringLength(100)]
-        public string Middle { get; set; }
+        public string Middle { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Last name is required")]
         [StringLength(100)]
-        public string Last { get; set; }
+        public string Last { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Gender is required")]
         [StringLength(50)]
-        public string Gender { get; set; }
+        public string Gender { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Date of birth is required")]
         public DateTime DOB { get; set; }

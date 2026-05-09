@@ -1,4 +1,5 @@
 ﻿using clinical.APIs.Modules.DentalClinic.Models;
+using clinical.APIs.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 using Radiology.Models;
 
@@ -10,6 +11,7 @@ namespace clinical.APIs.Shared.Data
             : base(options)
         { }
 
+        // DentalClinic Module DbSets
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Patient> Patients { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Doctor> Doctors { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Nurse> Nurses { get; set; }
@@ -35,7 +37,10 @@ namespace clinical.APIs.Shared.Data
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Prescription> Prescriptions { get; set; }
         public DbSet<clinical.APIs.Modules.DentalClinic.Models.Order> Orders { get; set; }
 
-        public DbSet<clinical.APIs.Shared.Models.ProcessedRequest> ProcessedRequests { get; set; }
+        public DbSet<DiagnosticReportMetadata> DiagnosticReportMetadata { get; set; }
+        public DbSet<LabDiagnosticReportMetadata> LabDiagnosticReportMetadata { get; set; }
+
+        public DbSet<ProcessedRequest> ProcessedRequests { get; set; }
 
         public DbSet<Admin> Admins { get; set; }
 
@@ -55,7 +60,6 @@ namespace clinical.APIs.Shared.Data
                 .HasForeignKey(a => a.Patient_ID)
                 .OnDelete(DeleteBehavior.Restrict);
 
-
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Appointment>()
                 .HasOne(a => a.Doctor)
                 .WithMany(d => d.Appointments)
@@ -68,13 +72,11 @@ namespace clinical.APIs.Shared.Data
                 .HasForeignKey(a => a.Nurse_ID)
                 .OnDelete(DeleteBehavior.Restrict);
 
-
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction>()
                 .HasOne(st => st.Supply)
                 .WithMany(s => s.StockTransactions)
                 .HasForeignKey(st => st.Supply_ID)
                 .OnDelete(DeleteBehavior.Cascade);
-
 
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Stock_Transaction>()
                 .HasOne(st => st.Doctor)
@@ -82,7 +84,6 @@ namespace clinical.APIs.Shared.Data
                 .HasForeignKey(st => st.Doctor_ID)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // EHR Change Log relationships
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.EHRChangeLog>()
                 .HasOne(cl => cl.EHR)
                 .WithMany(e => e.ChangeLogs)
@@ -101,71 +102,67 @@ namespace clinical.APIs.Shared.Data
                 .HasForeignKey(cl => cl.AppointmentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // MedicationRecord relationships
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.MedicationRecord>()
                 .HasOne(m => m.EHR)
                 .WithMany(e => e.Medications)
                 .HasForeignKey(m => m.EHR_ID)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ProcedureRecord relationships
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.ProcedureRecord>()
                 .HasOne(p => p.EHR)
                 .WithMany(e => e.Procedures)
                 .HasForeignKey(p => p.EHR_ID)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ToothRecord relationships
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.ToothRecord>()
                 .HasOne(t => t.EHR)
                 .WithMany(e => e.Teeth)
                 .HasForeignKey(t => t.EHR_ID)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // XRayRecord relationships
             modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.XRayRecord>()
                 .HasOne(x => x.EHR)
                 .WithMany(e => e.XRays)
                 .HasForeignKey(x => x.EHR_ID)
                 .OnDelete(DeleteBehavior.Cascade);
-                    // Radiology Module relationships
-                    modelBuilder.Entity<Report>()
-                        .HasOne(r => r.Radiologist)
-                        .WithMany(rad => rad.Reports)
-                        .HasForeignKey(r => r.RadiologistID)
-                        .OnDelete(DeleteBehavior.Restrict);
 
-                    modelBuilder.Entity<Report>()
-                        .HasOne(r => r.Patient)
-                        .WithMany(p => p.Reports)
-                        .HasForeignKey(r => r.PatientID)
-                        .OnDelete(DeleteBehavior.Restrict);
+            // Radiology Module relationships
+            modelBuilder.Entity<Report>()
+                .HasOne(r => r.Radiologist)
+                .WithMany(rad => rad.Reports)
+                .HasForeignKey(r => r.RadiologistID)
+                .OnDelete(DeleteBehavior.Restrict);
 
-                    modelBuilder.Entity<Report>()
-                        .HasOne(r => r.ImagingAppointment)
-                        .WithMany(i => i.Reports)
-                        .HasForeignKey(r => r.ImagingID)
-                        .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Report>()
+                .HasOne(r => r.Patient)
+                .WithMany(p => p.Reports)
+                .HasForeignKey(r => r.PatientID)
+                .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Report>()
+                .HasOne(r => r.ImagingAppointment)
+                .WithMany(i => i.Reports)
+                .HasForeignKey(r => r.ImagingID)
+                .OnDelete(DeleteBehavior.Restrict);
 
-                    // Prosthodontic Lab Module Relationships
-                    modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Order>()
-                        .HasOne(o => o.LabTechnician)
-                        .WithMany(lt => lt.Orders)
-                        .HasForeignKey(o => o.LabTechnicianID)
-                        .OnDelete(DeleteBehavior.Restrict);
+            // Prosthodontic Lab Module relationships
+            modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Order>()
+                .HasOne(o => o.LabTechnician)
+                .WithMany(lt => lt.Orders)
+                .HasForeignKey(o => o.LabTechnicianID)
+                .OnDelete(DeleteBehavior.Restrict);
 
-                    modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Prescription>()
-                        .HasOne(p => p.LabTechnician)
-                        .WithMany(lt => lt.Prescriptions)
-                        .HasForeignKey(p => p.LabTechnicianID)
-                        .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Prescription>()
+                .HasOne(p => p.LabTechnician)
+                .WithMany(lt => lt.Prescriptions)
+                .HasForeignKey(p => p.LabTechnicianID)
+                .OnDelete(DeleteBehavior.Restrict);
 
-                    modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Prescription>()
-                        .HasOne(p => p.Order)
-                        .WithMany(o => o.Prescriptions)
-                        .HasForeignKey(p => p.OrderID)
-                        .OnDelete(DeleteBehavior.Cascade);
-                }
-            }
+            modelBuilder.Entity<clinical.APIs.Modules.DentalClinic.Models.Prescription>()
+                .HasOne(p => p.Order)
+                .WithMany(o => o.Prescriptions)
+                .HasForeignKey(p => p.OrderID)
+                .OnDelete(DeleteBehavior.Cascade);
         }
+    }
+}

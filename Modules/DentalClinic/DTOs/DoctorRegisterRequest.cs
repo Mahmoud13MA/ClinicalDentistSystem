@@ -19,6 +19,6 @@ namespace clinical.APIs.Modules.DentalClinic.DTOs
         public string Password { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Registration key is required")]
-        public string RegistrationKey { get; set; }
+        public string RegistrationKey { get; set; } = string.Empty;
     }
 }
