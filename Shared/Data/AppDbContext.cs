@@ -40,6 +40,7 @@ namespace clinical.APIs.Shared.Data
         public DbSet<DiagnosticReportMetadata> DiagnosticReportMetadata { get; set; }
         public DbSet<LabDiagnosticReportMetadata> LabDiagnosticReportMetadata { get; set; }
 
+        public DbSet<ImagingAppointmentMetadata> ImagingAppointmentMetadata { get; set; }
         public DbSet<ProcessedRequest> ProcessedRequests { get; set; }
 
         public DbSet<Admin> Admins { get; set; }

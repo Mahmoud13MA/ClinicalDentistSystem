@@ -10,6 +10,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Radiology.Models;
 
 namespace clinical.APIs.Modules.Radiology.Controllers
@@ -17,33 +18,34 @@ namespace clinical.APIs.Modules.Radiology.Controllers
     [Authorize(Policy = "RadiologistOrAdmin")]
     [ApiController]
     [Route("api/v1/radiology/[controller]")]
-    public class ReportController(AppDbContext context , IMapper mapper, IMediator mediator, IFhirValidationService validationService) : ControllerBase
+    public class ReportController(
+        AppDbContext context,
+        IMapper mapper,
+        IMediator mediator,
+        IFhirValidationService validationService,
+        ILogger<ReportController> logger) : ControllerBase  // ← added logger
     {
-
         [HttpGet]
         public async Task<IActionResult> GetAllReports()
         {
             var reports = await context.Reports
-                 .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
-                 .ToListAsync();
+                .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
+                .ToListAsync();
 
-            if (!reports.Any())
-                return NotFound(new { error = "No reports found." });
-
+            // ← Fix #4: empty collection is Ok([]), not NotFound
             return Ok(reports);
         }
 
-   
         [HttpGet("{reportId}")]
         public async Task<IActionResult> GetReportById(int reportId)
         {
             var report = await context.Reports
-              .Where(r => r.ReportID == reportId)
-              .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
-              .FirstOrDefaultAsync();
+                .Where(r => r.ReportID == reportId)
+                .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
+                .FirstOrDefaultAsync();
 
             if (report == null)
-                return NotFound(new { error = "Report not found", reportId = reportId });
+                return NotFound(new { error = "Report not found", reportId });
 
             return Ok(report);
         }
@@ -52,30 +54,26 @@ namespace clinical.APIs.Modules.Radiology.Controllers
         public async Task<IActionResult> GetReportsByImagingAppointment(int imagingId)
         {
             var reports = await context.Reports
-              .Where(r => r.ImagingID == imagingId)
-              .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
-              .ToListAsync();
+                .Where(r => r.ImagingID == imagingId)
+                .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
+                .ToListAsync();
 
-            if (!reports.Any())
-                return NotFound(new { error = "No reports found for this imaging appointment", imagingId = imagingId });
-
+            // ← Fix #4: empty collection is Ok([]), not NotFound
             return Ok(reports);
         }
+
         [HttpGet("bypatient/{patientId}")]
         public async Task<IActionResult> GetReportsByPatient(int patientId)
         {
             var reports = await context.Reports
-             .Where(r => r.PatientID == patientId)
-             .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
-             .ToListAsync();
+                .Where(r => r.PatientID == patientId)
+                .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
+                .ToListAsync();
 
-            if (!reports.Any())
-                return NotFound(new { error = "No reports found for this patient", patientId = patientId });
-
+            // ← Fix #4: empty collection is Ok([]), not NotFound
             return Ok(reports);
         }
 
-        
         [HttpGet("byradiologist/{radiologistId}")]
         public async Task<IActionResult> GetReportsByRadiologist(int radiologistId)
         {
@@ -84,23 +82,17 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 .ProjectTo<ReportResponse>(mapper.ConfigurationProvider)
                 .ToListAsync();
 
-            if (!reports.Any())
-            {
-                return NotFound(new { error = "No reports found for this radiologist", radiologistId = radiologistId });
-            }
-
-          
+            // ← Fix #4: empty collection is Ok([]), not NotFound
             return Ok(reports);
         }
 
-       
         [HttpPost]
         public async Task<IActionResult> CreateReport([FromBody] ReportCreateRequest request)
         {
-
+            // Doctor's imaging appointment request must exist — enforces proper clinical flow
             var imaging = await context.ImagingAppointments.FindAsync(request.ImagingID);
             if (imaging == null)
-                return BadRequest(new { error = "Invalid imaging appointment ID" });
+                return BadRequest(new { error = "Invalid imaging appointment ID — a doctor must first create a radiology service request." });
 
             var patientExists = await context.RadiologyPatients.AnyAsync(p => p.PatientID == request.PatientID);
             if (!patientExists)
@@ -119,29 +111,33 @@ namespace clinical.APIs.Modules.Radiology.Controllers
 
             var diagnosticReport = BuildDiagnosticReport(report, imaging);
             var outcome = validationService.Validate(diagnosticReport);
-            if (!HasErrors(outcome))
+
+            // ← Fix #2: log validation errors clearly instead of silent skip
+            if (HasErrors(outcome))
+            {
+                var errors = string.Join(", ", outcome.Issue
+                    .Where(i => i.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal)
+                    .Select(i => i.Diagnostics));
+                logger.LogWarning("FHIR validation failed for DiagnosticReport {Id}: {Errors}", report.ReportID, errors);
+            }
+            else
             {
                 await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
             }
 
-            var response = mapper.Map<ReportResponse>(report);
-            return CreatedAtAction(nameof(GetReportById), new { reportId = report.ReportID }, response);
+            return CreatedAtAction(nameof(GetReportById), new { reportId = report.ReportID }, mapper.Map<ReportResponse>(report));
         }
 
-      
         [HttpPut("{reportId}")]
         public async Task<IActionResult> UpdateReport(int reportId, [FromBody] ReportUpdateRequest request)
         {
-
-
             if (reportId != request.ReportID)
                 return BadRequest(new { error = "Report ID mismatch between URL and body" });
 
             var report = await context.Reports.FindAsync(reportId);
             if (report == null)
-                return NotFound(new { error = "Report not found", reportId = reportId });
+                return NotFound(new { error = "Report not found", reportId });
 
-            // Validate and load navigation properties
             var imaging = await context.ImagingAppointments.FindAsync(request.ImagingID);
             if (imaging == null)
                 return BadRequest(new { error = "Invalid imaging appointment ID" });
@@ -154,41 +150,56 @@ namespace clinical.APIs.Modules.Radiology.Controllers
             if (radiologist == null)
                 return BadRequest(new { error = "Invalid radiologist ID" });
 
+            // ← Fix #3: capture previous findings to detect meaningful change
+            var previousFindings = report.Findings;
+
             mapper.Map(request, report);
-            // for the mapper
             report.ImagingAppointment = imaging;
             report.Radiologist = radiologist;
-
             await context.SaveChangesAsync();
 
-            var diagnosticReport = BuildDiagnosticReport(report, imaging);
-            var outcome = validationService.Validate(diagnosticReport);
-            if (!HasErrors(outcome))
+            // Only re-publish if findings actually changed — prevents duplicate metadata in DentalClinic
+            if (!string.Equals(previousFindings, report.Findings, StringComparison.Ordinal))
             {
-                await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+                var diagnosticReport = BuildDiagnosticReport(report, imaging);
+                var outcome = validationService.Validate(diagnosticReport);
+
+                if (HasErrors(outcome))
+                {
+                    var errors = string.Join(", ", outcome.Issue
+                        .Where(i => i.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal)
+                        .Select(i => i.Diagnostics));
+                    logger.LogWarning("FHIR validation failed for updated DiagnosticReport {Id}: {Errors}", report.ReportID, errors);
+                }
+                else
+                {
+                    await mediator.Publish(new RadiologyReportCompletedEvent(diagnosticReport), HttpContext.RequestAborted);
+                }
             }
 
-            var response = mapper.Map<ReportResponse>(report);
-            return Ok(new { message = "Report updated successfully", data = response });
+            return Ok(new { message = "Report updated successfully", data = mapper.Map<ReportResponse>(report) });
         }
 
         private static bool HasErrors(OperationOutcome outcome)
             => outcome.Issue.Any(issue => issue.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal);
 
-        private DiagnosticReport BuildDiagnosticReport(Report report, ImagingAppointment imaging)
+        private static DiagnosticReport BuildDiagnosticReport(Report report, ImagingAppointment imaging)
         {
-            var reportId = report.ReportID.ToString();
-            var status = DiagnosticReport.DiagnosticReportStatus.Final;
             var effectiveDate = imaging.Datetime == default ? DateTime.UtcNow : imaging.Datetime;
             var reportDate = report.ImagingAppointment?.Datetime ?? effectiveDate;
 
             return new DiagnosticReport
             {
-                Id = reportId,
-                Status = status,
+                Id = report.ReportID.ToString(),
+                Status = DiagnosticReport.DiagnosticReportStatus.Final,
                 Code = new CodeableConcept { Text = imaging.Type },
                 Effective = new FhirDateTime(reportDate),
                 Subject = new ResourceReference($"Patient/{report.PatientID}"),
+                // ← Fix #1: Performer added — was missing, radiologist reference lost
+                Performer = new List<ResourceReference>
+                {
+                    new ResourceReference($"Practitioner/{report.RadiologistID}")
+                },
                 Conclusion = report.Findings,
                 PresentedForm = new List<Attachment>
                 {
@@ -200,7 +211,5 @@ namespace clinical.APIs.Modules.Radiology.Controllers
                 }
             };
         }
-
-       
     }
 }

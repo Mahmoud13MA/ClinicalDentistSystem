@@ -2,12 +2,13 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using clinical.APIs.Modules.DentalClinic.Models;
 using clinical.APIs.Modules.ProsthodonticLab.DTOs;
+using clinical.APIs.Modules.ProsthodonticLab.Handlers;
 using clinical.APIs.Modules.ProsthodonticLab.Services;
 using clinical.APIs.Shared.Data;
-using clinical.APIs.Modules.ProsthodonticLab.Handlers;
 using ClinicalDentistSystem.Shared.Contracts.Lab;
 using ClinicalDentistSystem.Shared.Services;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,13 +30,11 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
         [HttpGet]
         public async Task<IActionResult> GetOrders()
         {
-            var orders = await context.Orders.ProjectTo<OrderResponse>(mapper.ConfigurationProvider).ToListAsync();
-            
-            if (orders.Count == 0)
-            {
-                return NotFound(new { error = "No orders found." });
-            }
+            var orders = await context.Orders
+                .ProjectTo<OrderResponse>(mapper.ConfigurationProvider)
+                .ToListAsync();
 
+            // ← Fix: empty collection is Ok([]), not NotFound
             return Ok(orders);
         }
 
@@ -45,9 +44,7 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
             var order = await context.Orders.FindAsync(id);
 
             if (order == null)
-            {
                 return NotFound(new { error = "Order not found.", orderID = id });
-            }
 
             return Ok(mapper.Map<OrderResponse>(order));
         }
@@ -57,23 +54,54 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
         {
             var order = mapper.Map<Order>(request);
 
-            context.Orders.Add(order);
-            await context.SaveChangesAsync();
-
+            // ← Fix: validate BEFORE saving — no orphaned DB records on failure
             var deviceRequest = mappingService.MapOrderToDeviceRequest(order);
             var outcome = validationService.Validate(deviceRequest);
             if (HasErrors(outcome))
             {
                 logger.LogWarning("FHIR validation failed for lab DeviceRequest {Id}", deviceRequest.Id);
+                return BadRequest(new { error = "FHIR validation failed for lab order." });
             }
-            else
+
+            context.Orders.Add(order);
+            await context.SaveChangesAsync();
+
+            await mediator.Publish(new LabOrderCreatedEvent(deviceRequest), HttpContext.RequestAborted);
+
+            return CreatedAtAction(nameof(GetOrder), new { id = order.OrderID }, mapper.Map<OrderResponse>(order));
+        }
+
+        // ← Added: dedicated retry endpoint for BackgroundSyncService
+        [HttpPost("retry")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RetryLabOrder([FromBody] LabOrderRetryPayload payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload?.FhirResource))
+                return BadRequest(new { error = "Missing FHIR resource payload." });
+
+            DeviceRequest deviceRequest;
+            try
             {
-                await mediator.Publish(new LabOrderCreatedEvent(deviceRequest), HttpContext.RequestAborted);
+                var parser = new FhirJsonParser();
+                deviceRequest = parser.Parse<DeviceRequest>(payload.FhirResource);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to deserialize FHIR DeviceRequest for retry.");
+                return BadRequest(new { error = "Invalid FHIR DeviceRequest payload." });
             }
 
-            var response = mapper.Map<OrderResponse>(order);
+            var outcome = validationService.Validate(deviceRequest);
+            if (HasErrors(outcome))
+            {
+                logger.LogWarning("FHIR validation failed on retry for DeviceRequest {Id}", deviceRequest.Id);
+                return BadRequest(new { error = "FHIR validation failed on retry." });
+            }
 
-            return CreatedAtAction(nameof(GetOrder), new { id = order.OrderID }, response);
+            await mediator.Publish(new LabOrderCreatedEvent(deviceRequest), HttpContext.RequestAborted);
+
+            logger.LogInformation("Retry published LabOrderCreatedEvent for DeviceRequest {Id}", deviceRequest.Id);
+            return Ok(new { message = "Lab order retry accepted." });
         }
 
         [HttpPut("{id}")]
@@ -81,22 +109,21 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
         {
             var order = await context.Orders.FindAsync(id);
             if (order == null)
-            {
                 return NotFound(new { error = "Order not found.", orderID = id });
-            }
 
+            // ← Fix: capture previous status before mapping to detect transition
+            var previousStatus = order.Status;
             mapper.Map(request, order);
-
             await context.SaveChangesAsync();
 
-            if (string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            // Only fire if status just transitioned TO Completed
+            if (!string.Equals(previousStatus, "Completed", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
             {
                 await mediator.Publish(new LabOrderCompletedEventTrigger(order.OrderID), HttpContext.RequestAborted);
             }
 
-            var response = mapper.Map<OrderResponse>(order);
-
-            return Ok(new { message = "Order updated successfully.", order = response });
+            return Ok(new { message = "Order updated successfully.", order = mapper.Map<OrderResponse>(order) });
         }
 
         [HttpPatch("{id}/status")]
@@ -104,22 +131,20 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
         {
             var order = await context.Orders.FindAsync(id);
             if (order == null)
-            {
                 return NotFound(new { error = "Order not found.", orderID = id });
-            }
 
+            // ← Fix: same transition guard for PATCH
+            var previousStatus = order.Status;
             order.Status = request.Status;
-
             await context.SaveChangesAsync();
 
-            if (string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(previousStatus, "Completed", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
             {
                 await mediator.Publish(new LabOrderCompletedEventTrigger(order.OrderID), HttpContext.RequestAborted);
             }
 
-            var response = mapper.Map<OrderResponse>(order);
-
-            return Ok(new { message = "Order status updated successfully.", order = response });
+            return Ok(new { message = "Order status updated successfully.", order = mapper.Map<OrderResponse>(order) });
         }
 
         [HttpDelete("{id}")]
@@ -127,9 +152,7 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
         {
             var order = await context.Orders.FindAsync(id);
             if (order == null)
-            {
                 return NotFound(new { error = "Order not found.", orderID = id });
-            }
 
             context.Orders.Remove(order);
             await context.SaveChangesAsync();

@@ -162,6 +162,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("DoctorOnly", policy => policy.RequireRole("Doctor"));
+    options.AddPolicy("DoctorOrAdmin", policy => policy.RequireRole("Doctor", "Admin"));
     options.AddPolicy("NurseOnly", policy => policy.RequireRole("Nurse"));
     options.AddPolicy("DoctorOrNurse", policy => policy.RequireRole("Doctor", "Nurse"));
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));

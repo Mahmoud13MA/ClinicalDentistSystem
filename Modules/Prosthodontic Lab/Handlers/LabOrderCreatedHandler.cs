@@ -13,7 +13,7 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Handlers;
 
 public class LabOrderCreatedHandler(
     AppDbContext context,
-    LocalQueueDbContext queueContext,      
+    LocalQueueDbContext queueContext,
     ILogger<LabOrderCreatedHandler> logger)
     : INotificationHandler<LabOrderCreatedEvent>
 {
@@ -27,40 +27,37 @@ public class LabOrderCreatedHandler(
             return;
         }
 
-        var orderId = ResolveOrderId(notification.LabOrder.Id);
-        if (orderId <= 0)
+        // FHIR ID is a GUID string — used only for logging and fallback queue key
+        var fhirId = notification.LabOrder.Id;
+        if (string.IsNullOrWhiteSpace(fhirId))
         {
-            logger.LogWarning("Lab order created event missing valid order id.");
+            logger.LogWarning("Lab order created event missing FHIR id.");
             return;
         }
-
-        var order = await context.Orders
-            .FirstOrDefaultAsync(o => o.OrderID == orderId, cancellationToken);
-
-        if (order != null)
-            return; // already processed — idempotent
 
         var patientId = ResolvePatientId(notification.LabOrder.Subject?.Reference, out var referenceError);
         if (patientId <= 0)
         {
-            logger.LogWarning("Lab order {OrderId} missing valid patient reference: {Reason}", orderId, referenceError);
-            await EnqueueFallbackAsync(notification.LabOrder, orderId, cancellationToken);
+            logger.LogWarning("Lab order {FhirId} missing valid patient reference: {Reason}", fhirId, referenceError);
+            await EnqueueFallbackAsync(notification.LabOrder, fhirId, cancellationToken);
             return;
         }
 
         var labTechnicianId = await ResolveLabTechnicianIdAsync(cancellationToken);
         if (labTechnicianId <= 0)
         {
-            logger.LogWarning("Lab order {OrderId} cannot be assigned — no lab technicians available.", orderId);
-            await EnqueueFallbackAsync(notification.LabOrder, orderId, cancellationToken);
+            logger.LogWarning("Lab order {FhirId} cannot be assigned — no lab technicians available.", fhirId);
+            await EnqueueFallbackAsync(notification.LabOrder, fhirId, cancellationToken);
             return;
         }
 
         var dentistId = ResolveDentistId(notification.LabOrder.Requester?.Reference);
+        if (dentistId <= 0)
+            logger.LogWarning("Lab order {FhirId} has missing or unresolvable Requester — DentistId will be 0.", fhirId);
 
         var newOrder = new clinical.APIs.Modules.DentalClinic.Models.Order
         {
-            OrderID = orderId,
+            // OrderID not set — EF auto-generates the int PK
             PatientId = patientId,
             DentistId = dentistId,
             LabTechnicianID = labTechnicianId,
@@ -81,24 +78,24 @@ public class LabOrderCreatedHandler(
             await context.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
-                "Lab order {OrderId} created for Patient={PatientId}, Dentist={DentistId}, LabTechnician={LabTechnicianId}",
-                orderId, patientId, dentistId, labTechnicianId);
+                "Lab order {FhirId} created for Patient={PatientId}, Dentist={DentistId}, LabTechnician={LabTechnicianId}",
+                fhirId, patientId, dentistId, labTechnicianId);
         }
         catch (Exception ex) when (ConnectivityErrorDetector.IsConnectivityError(ex))
         {
-            logger.LogWarning("DB connectivity error saving lab order {OrderId} — queuing for retry.", orderId);
-            await EnqueueFallbackAsync(notification.LabOrder, orderId, cancellationToken);
+            logger.LogWarning("DB connectivity error saving lab order {FhirId} — queuing for retry.", fhirId);
+            await EnqueueFallbackAsync(notification.LabOrder, fhirId, cancellationToken);
         }
     }
 
     private async System.Threading.Tasks.Task EnqueueFallbackAsync(
         DeviceRequest deviceRequest,
-        int orderId,
+        string fhirId,
         CancellationToken cancellationToken)
     {
         try
         {
-            var idempotencyKey = $"lab-order-created-{orderId}";
+            var idempotencyKey = $"lab-order-created-{fhirId}";
 
             var alreadyQueued = await queueContext.PendingOperations
                 .AnyAsync(p => p.IdempotencyKey == idempotencyKey
@@ -106,7 +103,7 @@ public class LabOrderCreatedHandler(
 
             if (alreadyQueued)
             {
-                logger.LogInformation("Lab order {OrderId} already queued, skipping duplicate.", orderId);
+                logger.LogInformation("Lab order {FhirId} already queued, skipping duplicate.", fhirId);
                 return;
             }
 
@@ -116,10 +113,10 @@ public class LabOrderCreatedHandler(
             var operation = new PendingOperation
             {
                 HttpMethod = "POST",
-                Route = $"api/v1/prosthodonticlab/order",
+                Route = "api/v1/prosthodonticlab/order/retry",  // ← updated route
                 Payload = JsonSerializer.Serialize(new
                 {
-                    orderId,
+                    fhirId,
                     fhirResource = fhirJson
                 }, SerializerOptions),
                 IdempotencyKey = idempotencyKey
@@ -128,16 +125,13 @@ public class LabOrderCreatedHandler(
             queueContext.PendingOperations.Add(operation);
             await queueContext.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Lab order {OrderId} queued for retry.", orderId);
+            logger.LogInformation("Lab order {FhirId} queued for retry.", fhirId);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to enqueue lab order {OrderId} for retry.", orderId);
+            logger.LogError(ex, "Failed to enqueue lab order {FhirId} for retry.", fhirId);
         }
     }
-
-    private static int ResolveOrderId(string? id)
-        => string.IsNullOrWhiteSpace(id) ? 0 : int.TryParse(id, out var orderId) ? orderId : 0;
 
     private static int ResolvePatientId(string? reference, out string error)
     {
