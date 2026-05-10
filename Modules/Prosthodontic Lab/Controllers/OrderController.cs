@@ -73,7 +73,6 @@ namespace clinical.APIs.Modules.ProsthodonticLab.Controllers
 
         // ← Added: dedicated retry endpoint for BackgroundSyncService
         [HttpPost("retry")]
-        [AllowAnonymous]
         public async Task<IActionResult> RetryLabOrder([FromBody] LabOrderRetryPayload payload)
         {
             if (string.IsNullOrWhiteSpace(payload?.FhirResource))
